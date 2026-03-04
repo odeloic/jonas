@@ -1,0 +1,16 @@
+services:
+  api:
+    restart: unless-stopped
+    ports: !reset []
+
+  postgres:
+    restart: unless-stopped
+    ports: !reset []
+
+  redis:
+    restart: unless-stopped
+    ports: !reset []
+
+  qdrant:
+    restart: unless-stopped
+    ports: !reset []

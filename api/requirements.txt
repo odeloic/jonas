@@ -4,6 +4,7 @@ python-dotenv
 pydantic-settings
 httpx
 structlog
+python-telegram-bot[job-queue]>=21.0
 
 # dev
 ruff

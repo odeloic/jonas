@@ -14,6 +14,7 @@ services:
         condition: service_healthy
     networks:
       - jonas-network
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
@@ -29,6 +30,7 @@ services:
       retries: 5
     networks:
       - jonas-network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -43,6 +45,7 @@ services:
       retries: 5
     networks:
       - jonas-network
+    restart: unless-stopped
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -51,6 +54,7 @@ services:
       - "6334:6334"
     networks:
       - jonas-network
+    restart: unless-stopped
 
 volumes:
   postgres-data:

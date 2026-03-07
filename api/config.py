@@ -9,9 +9,8 @@ class Settings(BaseSettings):
     postgres_password: str = "changeme"
     postgres_db: str = "jonas"
     redis_url: str = "redis://redis:6379"
-    whatsapp_verify_token: str = ""
-    whatsapp_phone_number_id: str = ""
-    whatsapp_access_token: str = ""
+    telegram_bot_token: str = ""
+    telegram_allowed_chat_id: str = ""
     anthropic_api_key: str = ""
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

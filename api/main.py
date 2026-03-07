@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
+from channels.telegram import build_app
 from config import settings
 from logging_config import configure_logging
 from routers.health import router as health_router
@@ -14,7 +15,18 @@ async def lifespan(app: FastAPI):
     configure_logging()
     log = structlog.get_logger()
     log.info("startup", service=settings.service_name, version=settings.version)
+
+    tg_app = build_app()
+    await tg_app.initialize()
+    await tg_app.start()
+    assert tg_app.updater is not None
+    await tg_app.updater.start_polling(drop_pending_updates=True)
+
     yield
+
+    await tg_app.updater.stop()
+    await tg_app.stop()
+    await tg_app.shutdown()
     log.info("shutdown", service=settings.service_name)
 
 

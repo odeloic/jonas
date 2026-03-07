@@ -1,0 +1,35 @@
+name:  Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd /opt/jonas
+            git pull origin main
+
+            # pull new images if any
+            docker compose pull
+
+            # Rebuild & Restart only changed services
+            docker compose up -d --build --remove-orphans
+
+            # Clean up old images
+            docker image prune -f
+
+            # Verify stack is running
+            docker compose ps

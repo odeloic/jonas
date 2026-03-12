@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Linear Project
+- workspace: odeloic-inc
+- project: jonas-mvp-german-tutor-agent-374b0ae7ed5c
+
 ## Stack
 
 FastAPI + Postgres + Redis + Qdrant, running via Docker Compose. The `api/` directory is mounted into the container — saving any file triggers uvicorn hot reload.

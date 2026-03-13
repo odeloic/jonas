@@ -10,6 +10,8 @@ from telegram.ext import (
 )
 
 from config import settings
+from models.triage import ImageCategory
+from services.vision_triage import download_photos_as_base64, triage_images
 
 MSG_UNAUTHORIZED = "Unauthorized"
 MSG_RECEIVED = "Received"
@@ -77,9 +79,43 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     log.info("teach_finished", file_ids=file_ids, count=len(file_ids))
+    await message.reply_text(f"Danke! {len(file_ids)} Foto(s) empfangen. Wird geprüft....")
+    try:
+        base64_images = await download_photos_as_base64(context.bot, file_ids)
+        triage_results = await triage_images(base64_images)
+    except Exception:
+        log.exception("teach_triage_failed")
+        await message.reply_text(
+            "Beim prüfen der Fotos ist ein Fehler aufgetreten. Bitte versuche es später erneut."
+        )
+        context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+        return ConversationHandler.END
 
-    # TODO: hand file_ids to downstream processing service
-    await message.reply_text(f"Danke! {len(file_ids)} Foto(s) empfangen. Verarbeitung startet....")
+    valid = [r for r in triage_results if r.category != ImageCategory.OTHER]
+    rejected = [r for r in triage_results if r.category == ImageCategory.OTHER]
+
+    if rejected:
+        log.info("teach_images_rejected", count=len(rejected))
+        await message.reply_text(
+            f"{len(rejected)} Foto(s) sind kein Lernmaterial und wurden aussortiert."
+        )
+
+    if not valid:
+        log.info("teach_all_rejected")
+        await message.reply_text(
+            "Keines der Fotos enthält deutsches Lernmaterial. "
+            "Bitte versuche es mit Buchseiten oder Grammatik-Screenshots erneut (/teach)."
+        )
+        context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+        return ConversationHandler.END
+
+    # valid_ids = [r.file_id for r in valid]  # TODO: needed for next milestone
+    log.info("teach_triage_passed", valid=len(valid), categories=[r.category for r in valid])
+
+    # TODO: hand valid_ids to downstream extraction service
+    await message.reply_text(
+        f"Danke! {len(valid)} Foto(s) erkannt als Lernmaterial. Verarbeitung startet..."
+    )
 
     context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
     return ConversationHandler.END
@@ -105,7 +141,7 @@ async def timeout_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def build_app():
-    app = ApplicationBuilder().token(settings.telegram_bot_token).build()
+    app = ApplicationBuilder().token(settings.telegram_bot_token).updater(None).build()
 
     teach_conv = ConversationHandler(
         entry_points=[CommandHandler("teach", start_teach)],

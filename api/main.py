@@ -24,12 +24,16 @@ async def lifespan(app: FastAPI):
     tg_app = build_app()
     await tg_app.initialize()
     await tg_app.start()
-    assert tg_app.updater is not None
-    await tg_app.updater.start_polling(drop_pending_updates=True)
+
+    webhook_url = f"{settings.telegram_webhook_base_url}/webhook/telegram"
+    await tg_app.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+    log.info("telegram_webhook_set", url=webhook_url)
+
+    app.state.tg_app = tg_app
 
     yield
 
-    await tg_app.updater.stop()
+    await tg_app.bot.delete_webhook()
     await tg_app.stop()
     await tg_app.shutdown()
     log.info("shutdown", service=settings.service_name)

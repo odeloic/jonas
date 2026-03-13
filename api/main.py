@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from channels.telegram import build_app
 from config import settings
 from logging_config import configure_logging
+from routers.dev import router as dev_router
 from routers.health import router as health_router
 from routers.webhooks import router as webhooks_router
 
@@ -13,6 +14,10 @@ from routers.webhooks import router as webhooks_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    if "anthropic" in settings.default_model and not settings.anthropic_api_key:
+        raise RuntimeError(
+            "ANTHROPIC_API_KEY is required"  # FIXME: generalize
+        )
     log = structlog.get_logger()
     log.info("startup", service=settings.service_name, version=settings.version)
 
@@ -34,3 +39,4 @@ app = FastAPI(title=settings.service_name, version=settings.version, lifespan=li
 
 app.include_router(health_router)
 app.include_router(webhooks_router)
+app.include_router(dev_router)

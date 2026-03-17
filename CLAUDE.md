@@ -60,18 +60,49 @@ api/
 ├── main.py           # App wiring only: lifespan, router registration
 ├── config.py         # All env vars via pydantic-settings (Settings singleton)
 ├── logging_config.py # structlog setup (JSON in prod, colored in dev)
+├── channels/
+│   └── telegram.py   # Telegram bot (ConversationHandler, /teach flow)
 ├── routers/
 │   ├── health.py     # GET /health
-│   └── webhooks.py   # POST /webhook/whatsapp
+│   ├── webhooks.py   # POST /webhook/whatsapp
+│   └── dev.py        # POST /dev/llm-ping (LLM test endpoint)
 ├── models/
 │   └── message.py    # Pydantic request/response models
-└── services/         # Business logic (agent integration lives here in M2+)
+└── services/
+    └── llm.py        # LiteLLM async wrapper (provider-agnostic)
 ```
 
 `main.py` owns no logic — only imports and wires. Logic belongs in its own module.
 
 All configuration is read from environment variables via `config.settings`. The `.env` file (copied from `.env.example`) is loaded automatically by pydantic-settings.
 
+## Key patterns
+
+### LLM service (`services/llm.py`)
+- `async def complete(messages, model=None, max_tokens=1024) -> str` — thin wrapper around `litellm.acompletion()`
+- Falls back to `settings.default_model` (currently `claude-haiku-4-5-20251001`)
+- Logs token usage via structlog; catches `AuthenticationError` and `APIError`
+
+### Telegram bot (`channels/telegram.py`)
+- Built with `python-telegram-bot>=21.0` (async, v21 API)
+- Auth guard: `is_correct_chat()` checks `settings.telegram_allowed_chat_id`
+- `/teach` flow uses `ConversationHandler` with states: `WAITING_FOR_PHOTOS → /done`
+- Photos accumulated as `file_id` strings in `context.user_data`
+- 5-minute conversation timeout
+- Bot is initialized in `main.py` lifespan, runs via polling
+
+### Logging
+- structlog everywhere: `log = structlog.get_logger()` then `log.info("event_name", key=value)`
+- Dev: colored console. Prod: JSON to stdout.
+
+### Config (`config.py`)
+- Pydantic `BaseSettings` singleton, all env vars
+- Key settings: `default_model`, `telegram_bot_token`, `telegram_allowed_chat_id`, `anthropic_api_key`
+
 ## Async pattern
 
 Webhook handlers return immediately (`{"received": True}`) — no blocking work in the request lifecycle. Background processing will be dispatched from `services/` in later milestones.
+
+## User-facing language
+
+The bot speaks German to the user. All user-facing messages (Telegram replies, error messages) should be in German.

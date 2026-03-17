@@ -11,10 +11,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379"
     telegram_bot_token: str = ""
     telegram_allowed_chat_id: str = ""
+    telegram_webhook_base_url: str = ""  # e.g. https://abc123.ngrok-free.app
     anthropic_api_key: str = ""
     openai_api_key: str = ""  # OPENAI_API_KEY
     default_model: str = "claude-haiku-4-5-20251001"
     # default_model: str = "gpt-5-mini-2025-08-07"
+    triage_model: str = "claude-haiku-4-5-20251001"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     default_model: str = "claude-haiku-4-5-20251001"
     # default_model: str = "gpt-5-mini-2025-08-07"
     triage_model: str = "claude-haiku-4-5-20251001"
+    extraction_model: str = "claude-haiku-4-5-20251001"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

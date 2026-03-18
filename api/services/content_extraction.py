@@ -15,6 +15,8 @@ Extract ALL structured content visible on the page into the requested JSON forma
 Rules:
 - Extract grammar rules WITH their full explanations as written — do not summarize or rephrase.
 - Extract every vocabulary item visible, including article and plural when shown.
+- For each vocabulary item, provide a concise English translation in
+definition_en, even if the page is German-only.
 - Extract example sentences separately, with their annotation if one is given.
 - If a field is not visible on the page, return null — never fabricate content.
 - Set topic to the chapter or section heading if visible, otherwise your best description.

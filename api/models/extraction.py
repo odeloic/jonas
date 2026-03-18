@@ -7,6 +7,7 @@ class VocabularyItem(BaseModel):
     plural: str | None = None
     word_class: str
     definition_de: str | None = None
+    definition_en: str | None = None
     example_sentence: str | None = None
 
 

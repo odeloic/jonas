@@ -27,6 +27,35 @@ Health check URLs:
 - API: http://localhost:8000/health
 - Qdrant: http://localhost:6333/dashboard
 
+## Database migrations (Alembic)
+
+Alembic is configured with async SQLAlchemy (`asyncpg` driver). Migrations auto-run on container start via the Dockerfile entrypoint.
+
+```bash
+# Generate a new migration from model changes
+docker compose exec api alembic revision --autogenerate -m "description"
+
+# Apply all pending migrations
+docker compose exec api alembic upgrade head
+
+# Roll back one migration
+docker compose exec api alembic downgrade -1
+
+# Show current migration state
+docker compose exec api alembic current
+
+# Show migration history
+docker compose exec api alembic history
+```
+
+Key files:
+- `api/db.py` — SQLAlchemy engine, async session factory, `Base` class
+- `api/alembic.ini` — Alembic config (DB URL set from Python, not here)
+- `api/migrations/env.py` — Async migration runner, imports models for autogenerate
+- `api/migrations/versions/` — Migration scripts
+
+When adding new models: import them in `migrations/env.py` so autogenerate can see them.
+
 ## Python / dependency management
 
 The project uses `uv` inside Docker (see `api/Dockerfile`). For local tooling, always activate the venv first:

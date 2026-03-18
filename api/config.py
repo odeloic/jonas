@@ -6,8 +6,13 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     log_level: str = "debug"
     postgres_user: str = "jonas"
-    postgres_password: str = "changeme"
+    postgres_password: str = "jonas"
     postgres_db: str = "jonas"
+
+    @property
+    def database_url(self) -> str:
+        return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@postgres:5432/{self.postgres_db}"
+
     redis_url: str = "redis://redis:6379"
     telegram_bot_token: str = ""
     telegram_allowed_chat_id: str = ""

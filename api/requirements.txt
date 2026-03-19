@@ -11,6 +11,7 @@ python-telegram-bot[job-queue]>=21.0
 sqlalchemy[asyncio]
 asyncpg
 alembic
+qdrant-client
 
 # dev
 ruff

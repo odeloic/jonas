@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # default_model: str = "gpt-5-mini-2025-08-07"
     triage_model: str = "claude-haiku-4-5-20251001"
     extraction_model: str = "claude-haiku-4-5-20251001"
+    qdrant_url: str = "http://qdrant:6333"
+    qdrant_collection: str = "grammar_rules"
+    embedding_model: str = "text-embedding-3-small"
+    qdrant_similarity_threshold: float = 0.92
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

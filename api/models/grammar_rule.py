@@ -21,7 +21,7 @@ class GrammarRule(Base):
     rule_name: Mapped[str] = mapped_column(String(255))
     explanation: Mapped[str] = mapped_column(Text)
     pattern: Mapped[str | None] = mapped_column(Text)
-    examples: Mapped[dict] = mapped_column(JSONB, default=list)
+    examples: Mapped[list[str]] = mapped_column(JSONB, default=list)
     source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"))
     source_type: Mapped[str] = mapped_column(String(20), default="INGESTED")
     verified: Mapped[bool] = mapped_column(default=False)

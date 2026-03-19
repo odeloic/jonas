@@ -12,6 +12,7 @@ from telegram.ext import (
 from config import settings
 from models.triage import ImageCategory
 from services.content_extraction import extract_page
+from services.ingestion import persist_extractions
 from services.vision_triage import download_photos_as_base64, triage_images
 
 MSG_UNAUTHORIZED = "Unauthorized"
@@ -130,13 +131,20 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Ein foto konnte nicht verabeitet werden und wurde überspungen."
             )  # TODO: should delete images / discarded
     if extractions:
-        # Summarize findings
-        total_rules = sum(len(e.grammar_rules) for e in extractions)
-        total_vocab = sum(len(e.vocabulary) for e in extractions)
-        await message.reply_text(
-            f"Fertig! {total_rules} Grammatikregel(n) und {total_vocab} Vokabeln extrahiert"
-        )
-        # TODO: NEXT up Persist extractions to Postgres + Qdrant
+        try:
+            source = await persist_extractions(extractions)
+            # Summarize findings
+            total_rules = sum(len(e.grammar_rules) for e in extractions)
+            total_vocab = sum(len(e.vocabulary) for e in extractions)
+            await message.reply_text(
+                f"Fertig! {total_rules} Grammatikregel(n) und {total_vocab} Vokabeln gespeichert"
+            )
+            log.info("teach_persisted", source_id=source.id)
+        except Exception:
+            log.exception("teach_persist_failed")
+            await message.reply_text(
+                "Beim Speichern ist ein Fehler aufgetreten. Bitte versuche es erneut."
+            )
     else:
         await message.reply_text("Aus den Fotos konnte leider kein Inhalt extrahiert werden.")
 

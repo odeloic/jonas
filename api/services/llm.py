@@ -56,7 +56,17 @@ async def complete_structured[T: PydanticBaseModel](
     max_tokens: int = 1024,
 ) -> T:
     response = await _call_llm(
-        messages, model=model, max_tokens=max_tokens, response_format=response_format
+        messages,
+        model=model,
+        max_tokens=max_tokens,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": response_format.__name__,
+                "strict": True,
+                "schema": response_format.model_json_schema(),
+            },
+        },
     )
     raw = response.choices[0].message.content or ""
     return response_format.model_validate_json(raw)

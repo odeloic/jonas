@@ -27,6 +27,51 @@ Health check URLs:
 - API: http://localhost:8000/health
 - Qdrant: http://localhost:6333/dashboard
 
+## Database migrations (Alembic)
+
+Alembic is configured with async SQLAlchemy (`asyncpg` driver). Migrations auto-run on container start via the Dockerfile entrypoint.
+
+### Creating a new migration
+
+1. Add/edit SQLAlchemy model in `api/models/`
+2. **Import the model in `api/migrations/env.py`** — autogenerate only sees models attached to `Base.metadata`
+3. Generate: `docker compose exec api alembic revision --autogenerate -m "description"`
+4. **Sanity-check the generated file** in `api/migrations/versions/` — verify it has the expected `op.create_table()` / `op.add_column()` calls (not empty `pass`)
+5. Apply: `docker compose exec api alembic upgrade head`
+6. Verify: `docker compose exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c '\dt'`
+
+### Common commands
+
+```bash
+docker compose exec api alembic upgrade head      # apply all pending
+docker compose exec api alembic downgrade -1       # roll back one
+docker compose exec api alembic current            # show current revision
+docker compose exec api alembic history            # show all revisions
+```
+
+### Deleting / reverting a migration
+
+```bash
+# Roll back first, then delete the file
+docker compose exec api alembic downgrade -1
+rm api/migrations/versions/<revision>_<slug>.py
+
+# If the migration was empty / broken and already applied, clear the stamp manually:
+docker compose exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c 'DELETE FROM alembic_version;'
+```
+
+### Gotchas
+
+- **Missing model imports in `env.py`** → autogenerate produces empty migrations (`pass`). Always import new models there.
+- `migrations/versions/` is excluded from ruff (configured in `api/pyproject.toml`).
+- `api/db.py` — uses `expire_on_commit=False` (not `expires_on_commit`).
+
+Key files:
+- `api/db.py` — SQLAlchemy engine, async session factory, `Base` class
+- `api/alembic.ini` — Alembic config (DB URL set from Python, not here)
+- `api/migrations/env.py` — Async migration runner, imports models for autogenerate
+- `api/migrations/versions/` — Migration scripts
+
 ## Python / dependency management
 
 The project uses `uv` inside Docker (see `api/Dockerfile`). For local tooling, always activate the venv first:

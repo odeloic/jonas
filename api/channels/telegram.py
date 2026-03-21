@@ -11,6 +11,7 @@ from telegram.ext import (
 
 from config import settings
 from models.triage import ImageCategory
+from services.assignment import generate_assignment, save_assignment
 from services.content_extraction import extract_page
 from services.ingestion import persist_extractions
 from services.vision_triage import download_photos_as_base64, triage_images
@@ -132,14 +133,21 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )  # TODO: should delete images / discarded
     if extractions:
         try:
-            source = await persist_extractions(extractions)
+            source, rule_ids = await persist_extractions(extractions)
             # Summarize findings
             total_rules = sum(len(e.grammar_rules) for e in extractions)
             total_vocab = sum(len(e.vocabulary) for e in extractions)
+
+            # Generate and save assignment
+            topic = extractions[0].topic
+            assignment_content = await generate_assignment(extractions, topic=topic)
+            assignment = await save_assignment(topic, assignment_content, rule_ids)
             await message.reply_text(
-                f"Fertig! {total_rules} Grammatikregel(n) und {total_vocab} Vokabeln gespeichert"
+                f"Fertig! {total_rules} Grammatikregel(n) und {total_vocab} Vokabeln gespeichert.\n"
+                f"Übung #{assignment.id} wurde erstellt "
+                f"({sum(len(s.items) for s in assignment_content.sections)} Aufgaben)."
             )
-            log.info("teach_persisted", source_id=source.id)
+            log.info("teach_persisted", source_id=source.id, assignment_id=assignment.id)
         except Exception:
             log.exception("teach_persist_failed")
             await message.reply_text(

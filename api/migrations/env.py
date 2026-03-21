@@ -4,6 +4,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import models.assignment  # noqa: F401
 import models.grammar_rule  # noqa: F401
 import models.source  # noqa: F401
 import models.vocabulary_item  # noqa: F401

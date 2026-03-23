@@ -45,7 +45,7 @@ async def extract_page(b64_image: str) -> PageExtraction:
     ]
 
     result = await complete_structured(
-        messages, response_format=PageExtraction, model=settings.extraction_model, max_tokens=4096
+        messages, response_format=PageExtraction, model=settings.extraction_model, max_tokens=16384
     )
 
     log.info(

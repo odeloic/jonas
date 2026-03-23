@@ -10,8 +10,10 @@ from services.qdrant import ensure_collection, upsert_grammar_rule
 log = structlog.get_logger()
 
 
-async def persist_extractions(extractions: list[PageExtraction]) -> Source:
-    """Persist a batch of page extractions to Postgres inside a single transactions"""
+async def persist_extractions(extractions: list[PageExtraction]) -> tuple[Source, list[int]]:
+    """Persist a batch of page extractions to Postgres inside a single transactions.
+    Returns the source and a list of grammar rule IDs that were created.
+    """
     ensure_collection()
     async with async_session() as session:
         async with session.begin():
@@ -47,6 +49,7 @@ async def persist_extractions(extractions: list[PageExtraction]) -> Source:
                         )
                     )
             await session.flush()  # Flush to get rule IDs before Qdrant upsert
+            rule_ids = [row.id for row, _ in rule_rows]
             source.status = "complete"
 
     # Step 2: Embed & Upsert to Qdrant after Postgres Commit
@@ -73,4 +76,4 @@ async def persist_extractions(extractions: list[PageExtraction]) -> Source:
         qdrant_merged=sum(1 for r in qdrant_results if r["action"] == "merged"),
     )
 
-    return source
+    return source, rule_ids

@@ -27,7 +27,7 @@ def mount_spa(app):
 
 
 @router.get("/{path:path}")
-async def serve_spa(path: str):
+def serve_spa(path: str):
     if not SPA_DIR.is_dir():
         return JSONResponse({"error": "SPA not built"}, status_code=404)
     file = SPA_DIR / path

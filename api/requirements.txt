@@ -4,7 +4,6 @@ python-dotenv
 pydantic-settings
 httpx
 structlog
-litellm
 anthropic
 openai
 python-telegram-bot[job-queue]>=21.0

@@ -1,3 +1,5 @@
+import asyncio
+
 import structlog
 from telegram import Update
 from telegram.ext import (
@@ -13,7 +15,7 @@ from config import settings
 from models.triage import ImageCategory
 from services.assignment import generate_assignment, save_assignment
 from services.content_extraction import extract_page
-from services.ingestion import persist_extractions
+from services.ingestion import check_processed_images, persist_extractions
 from services.vision_triage import download_photos_as_base64, triage_images
 
 MSG_UNAUTHORIZED = "Unauthorized"
@@ -23,6 +25,12 @@ log = structlog.get_logger()
 
 WAITING_FOR_PHOTOS = 0
 KEY_PHOTO_FILE_IDS = "photo_file_ids"
+KEY_PHOTO_UNIQUE_IDS = "photo_unique_ids"
+
+
+def _clear_photo_data(user_data: dict) -> None:
+    user_data.pop(KEY_PHOTO_FILE_IDS, None)
+    user_data.pop(KEY_PHOTO_UNIQUE_IDS, None)
 
 
 def is_correct_chat(chat_id: int | str) -> bool:
@@ -50,6 +58,7 @@ async def start_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log.info("teach_started", chat_id=update.effective_chat.id if update.effective_chat else None)
 
     context.user_data[KEY_PHOTO_FILE_IDS] = []
+    context.user_data[KEY_PHOTO_UNIQUE_IDS] = []
     await message.reply_text("Schicke mir deine Fotos! Wenn du fertig bist, sende /done")
 
     return WAITING_FOR_PHOTOS
@@ -62,7 +71,9 @@ async def collect_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return WAITING_FOR_PHOTOS
 
     file_id = message.photo[-1].file_id
+    file_unique_id = message.photo[-1].file_unique_id
     context.user_data[KEY_PHOTO_FILE_IDS].append(file_id)
+    context.user_data[KEY_PHOTO_UNIQUE_IDS].append(file_unique_id)
 
     count = len(context.user_data[KEY_PHOTO_FILE_IDS])
     log.info("teach_photo_received", file_id=file_id, total=count)
@@ -76,10 +87,36 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message is None:
         return ConversationHandler.END
     file_ids = context.user_data.get(KEY_PHOTO_FILE_IDS, [])
+    unique_ids = context.user_data.get(KEY_PHOTO_UNIQUE_IDS, [])
 
     if not file_ids:
         await message.reply_text("Du hast keine Fotos geschickt. Bitte starte mit /teach erneut.")
         return ConversationHandler.END
+
+    # --- Dedup check: skip already-processed images ---
+    already_processed = await check_processed_images(unique_ids)
+    new_pairs = [
+        (fid, uid)
+        for fid, uid in zip(file_ids, unique_ids, strict=True)
+        if uid not in already_processed
+    ]
+    skipped = len(file_ids) - len(new_pairs)
+
+    if not new_pairs:
+        log.info("teach_all_duplicates", count=len(file_ids))
+        await message.reply_text("Diese Bilder wurden bereits verarbeitet.")
+        _clear_photo_data(context.user_data)
+        return ConversationHandler.END
+
+    if skipped:
+        log.info("teach_duplicates_skipped", skipped=skipped)
+        await message.reply_text(f"{skipped} Foto(s) wurden bereits verarbeitet und übersprungen.")
+
+    file_ids = [fid for fid, _ in new_pairs]
+    unique_ids = [uid for _, uid in new_pairs]
+
+    # Build mapping from file_id -> file_unique_id for later persistence
+    fid_to_uid = dict(zip(file_ids, unique_ids, strict=True))
 
     log.info("teach_finished", file_ids=file_ids, count=len(file_ids))
     await message.reply_text(f"Danke! {len(file_ids)} Foto(s) empfangen. Wird geprüft....")
@@ -91,7 +128,7 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(
             "Beim prüfen der Fotos ist ein Fehler aufgetreten. Bitte versuche es später erneut."
         )
-        context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+        _clear_photo_data(context.user_data)
         return ConversationHandler.END
 
     valid = [r for r in triage_results if r.category != ImageCategory.OTHER]
@@ -109,7 +146,7 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Keines der Fotos enthält deutsches Lernmaterial. "
             "Bitte versuche es mit Buchseiten oder Grammatik-Screenshots erneut (/teach)."
         )
-        context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+        _clear_photo_data(context.user_data)
         return ConversationHandler.END
 
     log.info("teach_triage_passed", valid=len(valid), categories=[r.category for r in valid])
@@ -118,22 +155,31 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Danke! {len(valid)} Foto(s) erkannt als Lernmaterial. Verarbeitung startet..."
     )
 
-    # Extracting content from each valid image
-    valid_b64 = {fid: b64 for fid, b64 in base64_images}
+    # --- Extract content from valid images concurrently ---
+    b64_by_file_id = dict(base64_images)
+    tasks = [extract_page(b64_by_file_id[r.file_id]) for r in valid]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
     extractions = []
-    for r in valid:
-        try:
-            extraction = await extract_page(valid_b64[r.file_id])
-            extractions.append(extraction)
-            log.info("teach_extraction_ok", file_id=r.file_id, topic=extraction.topic)
-        except Exception:
-            log.exception("teach_extraction_failed", file_id=r.file_id)
-            await message.reply_text(
-                "Ein foto konnte nicht verabeitet werden und wurde überspungen."
-            )  # TODO: should delete images / discarded
+    image_metadata = []
+    failed_count = 0
+    for r, result in zip(valid, results, strict=True):
+        if isinstance(result, Exception):
+            failed_count += 1
+            log.error("teach_extraction_failed", file_id=r.file_id, error=repr(result))
+        else:
+            extractions.append(result)
+            image_metadata.append((fid_to_uid[r.file_id], r.file_id))
+            log.info("teach_extraction_ok", file_id=r.file_id, topic=result.topic)
+
+    if failed_count:
+        await message.reply_text(
+            f"{failed_count} Foto(s) konnten nicht verarbeitet werden und wurden übersprungen."
+        )
+
     if extractions:
         try:
-            source, rule_ids = await persist_extractions(extractions)
+            source, rule_ids = await persist_extractions(extractions, image_metadata=image_metadata)
             # Summarize findings
             total_rules = sum(len(e.grammar_rules) for e in extractions)
             total_vocab = sum(len(e.vocabulary) for e in extractions)
@@ -156,7 +202,7 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await message.reply_text("Aus den Fotos konnte leider kein Inhalt extrahiert werden.")
 
-    context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+    _clear_photo_data(context.user_data)
     return ConversationHandler.END
 
 
@@ -166,7 +212,7 @@ async def cancel_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message is None:
         return ConversationHandler.END
 
-    context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+    _clear_photo_data(context.user_data)
     log.info("teach_cancelled")
 
     await message.reply_text("Abgebrochen")
@@ -175,7 +221,7 @@ async def cancel_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def timeout_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data is not None:
-        context.user_data.pop(KEY_PHOTO_FILE_IDS, None)
+        _clear_photo_data(context.user_data)
     log.info("teach_timed_out")
 
 

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 
 import structlog
 from telegram import Update
@@ -13,6 +14,8 @@ from telegram.ext import (
 )
 
 from config import settings
+from db import async_session
+from models.assignment import Assignment
 from models.triage import ImageCategory
 from services.assignment import generate_assignment, save_assignment
 from services.content_extraction import extract_page
@@ -220,11 +223,23 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         item_count = sum(len(s.items) for s in assignment_content.sections)
         section_count = len(assignment_content.sections)
-        await message.reply_text(
+
+        text = (
             f"Fertig! Übung #{assignment.id} ist bereit: "
             f"{section_count} Abschnitte mit {item_count} Aufgaben.\n\n"
             f"Thema: {topic}"
         )
+        if settings.web_base_url:
+            url = f"{settings.web_base_url}/assignments/{assignment.id}"
+            text += f"\n\nHier starten: {url}"
+
+        await message.reply_text(text)
+
+        async with async_session() as session:
+            async with session.begin():
+                row = await session.get(Assignment, assignment.id)
+                row.sent_at = datetime.now(UTC)
+
         log.info("teach_persisted", source_id=source.id, assignment_id=assignment.id)
     except Exception:
         log.exception("teach_persist_failed")

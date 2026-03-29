@@ -26,10 +26,28 @@ def mount_spa(app):
     log.info("spa_mounted", path=str(SPA_DIR))
 
 
+BLOCKED_PREFIXES = (
+    ".git",
+    ".env",
+    ".svn",
+    "wp-",
+    "wordpress",
+    "wp/",
+    "stripe",
+    "credentials",
+    "config.php",
+    "admin-ajax",
+    "debug.log",
+)
+
+
 @router.get("/{path:path}")
 def serve_spa(path: str):
     if not SPA_DIR.is_dir():
         return JSONResponse({"error": "SPA not built"}, status_code=404)
+    lower = path.lower()
+    if any(lower.startswith(p) or f"/{p}" in lower for p in BLOCKED_PREFIXES):
+        return JSONResponse({"error": "Not found"}, status_code=404)
     file = SPA_DIR / path
     if path and file.is_file():
         return FileResponse(str(file))

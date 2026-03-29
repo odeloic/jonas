@@ -8,9 +8,12 @@ from config import settings
 from logging_config import configure_logging
 from routers.assignments import router as assignments_router
 from routers.dev import router as dev_router
+from routers.grammar import router as grammar_router
 from routers.health import router as health_router
 from routers.spa import mount_spa
 from routers.spa import router as spa_router
+from routers.stats import router as stats_router
+from routers.vocabulary import router as vocabulary_router
 from routers.webhooks import router as webhooks_router
 
 
@@ -48,6 +51,9 @@ app.include_router(health_router)
 app.include_router(webhooks_router)
 app.include_router(dev_router)
 app.include_router(assignments_router)
+app.include_router(grammar_router)
+app.include_router(vocabulary_router)
+app.include_router(stats_router)
 
 mount_spa(app)
 app.include_router(spa_router)

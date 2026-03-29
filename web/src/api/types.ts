@@ -1,3 +1,46 @@
+// --- Grammar types ---
+
+export interface GrammarRule {
+  id: number;
+  topic: string;
+  rule_name: string;
+  explanation: string;
+  pattern: string | null;
+  examples: string[];
+  verified: boolean;
+  created_at: string;
+}
+
+export interface TopicSummary {
+  topic: string;
+  count: number;
+}
+
+// --- Vocabulary types ---
+
+export interface VocabItem {
+  id: number;
+  word: string;
+  article: string | null;
+  plural: string | null;
+  word_class: string;
+  definition_de: string | null;
+  definition_en: string | null;
+  example_sentence: string | null;
+  created_at: string;
+}
+
+// --- Stats types ---
+
+export interface Stats {
+  grammar_rules: number;
+  vocabulary_items: number;
+  assignments: number;
+  topics: number;
+}
+
+// --- Assignment types ---
+
 export type SectionType =
   | "REORDER"
   | "COMPLETION"

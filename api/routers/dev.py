@@ -4,10 +4,11 @@ from pydantic import BaseModel
 
 from models.extraction import PageExtraction
 from services.content_extraction import extract_page
-from services.llm import complete
+from services.llm_service import LLMService
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 log = structlog.get_logger()
+_llm = LLMService()
 
 
 class ExtractRequest(BaseModel):
@@ -17,7 +18,10 @@ class ExtractRequest(BaseModel):
 @router.post("/llm-ping")
 async def llm_ping():
     try:
-        reply = await complete(messages=[{"role": "user", "content": "Hallo, bist du Jonas?"}])
+        result = await _llm.complete(
+            messages=[{"role": "user", "content": "Hallo, bist du Jonas?"}]
+        )
+        reply = result.parsed
     except Exception as exc:
         log.error("llm_ping_failed", error=str(exc))
         raise HTTPException(status_code=500, detail="LLM Call failed") from exc

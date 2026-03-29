@@ -2,9 +2,10 @@ import structlog
 
 from config import settings
 from models.extraction import PageExtraction
-from services.llm import complete_structured
+from services.llm_service import LLMService
 
 log = structlog.get_logger()
+_llm = LLMService()
 
 EXTRACTION_SYSTEM_PROMPT = """\
 You are a German language content extractor for a B2-level learner.
@@ -44,9 +45,14 @@ async def extract_page(b64_image: str) -> PageExtraction:
         },
     ]
 
-    result = await complete_structured(
-        messages, response_format=PageExtraction, model=settings.extraction_model, max_tokens=16384
-    )
+    result = (
+        await _llm.complete_structured(
+            messages,
+            response_format=PageExtraction,
+            model=settings.extraction_model,
+            max_tokens=16384,
+        )
+    ).parsed
 
     log.info(
         "content_extracted",

@@ -6,9 +6,10 @@ from telegram import Bot
 
 from config import settings
 from models.triage import ImageCategory, TriageResponse, TriageResult
-from services.llm import complete_structured
+from services.llm_service import LLMService
 
 log = structlog.get_logger()
+_llm = LLMService()
 
 TRIAGE_PROMPT = """\
 You are an image classifier for a German language learning app.
@@ -53,12 +54,14 @@ async def triage_images(
 
     messages = [{"role": "user", "content": content}]
 
-    result = await complete_structured(
-        messages,
-        response_format=TriageResponse,
-        model=settings.triage_model,
-        max_tokens=512,
-    )
+    result = (
+        await _llm.complete_structured(
+            messages,
+            response_format=TriageResponse,
+            model=settings.triage_model,
+            max_tokens=512,
+        )
+    ).parsed
 
     if len(result.classifications) != n:
         log.warning("triage_count_mismatch", expected=n, got=len(result.classifications))

@@ -5,9 +5,10 @@ from db import async_session
 from models.assignment import Assignment as AssignmentRow
 from models.assignment_schema import AssignmentContent
 from models.extraction import PageExtraction
-from services.llm import complete_structured
+from services.llm_service import LLMService
 
 log = structlog.get_logger()
+_llm = LLMService()
 
 ASSIGNMENT_SYSTEM_PROMPT = """\
 Du bist ein Deutschlehrer und erstellst Übungen für einen B2-Lerner.
@@ -75,15 +76,17 @@ async def generate_assignment(
             f"Erstelle Übungen zum Thema: {resolved_topic}\n\n"
             "Keine Regeln vorhanden - erstelle Übungen nur basierend auf dem Thema."
         )
-    result = await complete_structured(
-        messages=[
-            {"role": "system", "content": ASSIGNMENT_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        response_format=AssignmentContent,
-        model=settings.assignment_model,
-        max_tokens=4096,
-    )
+    result = (
+        await _llm.complete_structured(
+            messages=[
+                {"role": "system", "content": ASSIGNMENT_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            response_format=AssignmentContent,
+            model=settings.assignment_model,
+            max_tokens=4096,
+        )
+    ).parsed
 
     log.info(
         "assignment_generated",

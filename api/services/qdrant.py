@@ -1,11 +1,12 @@
-import litellm
 import structlog
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from config import settings
+from services.llm_service import LLMService
 
 log = structlog.get_logger()
+_llm = LLMService()
 
 _client: QdrantClient | None = None
 
@@ -30,9 +31,8 @@ def ensure_collection():
 
 
 async def embed_text(text: str) -> list[float]:
-    """Get embedding vector for a text chunk via liteLLM"""
-    response = await litellm.aembedding(model=settings.embedding_model, input=[text])
-    return response.data[0]["embedding"]
+    """Get embedding vector for a text chunk via OpenAI SDK."""
+    return await _llm.embed(text)
 
 
 def _build_chunk_text(topic: str, rule_name: str, explanation: str, examples: list[str]) -> str:

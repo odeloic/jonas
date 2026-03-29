@@ -23,13 +23,13 @@ jobs:
             git pull origin main
 
             # pull new images if any
-            docker compose pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 
             # Rebuild & Restart only changed services
-            docker compose up -d --build --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
 
             # Clean up old images
             docker image prune -f
 
             # Verify stack is running
-            docker compose ps
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps

@@ -2,6 +2,7 @@ import asyncio
 
 import structlog
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -118,15 +119,23 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Build mapping from file_id -> file_unique_id for later persistence
     fid_to_uid = dict(zip(file_ids, unique_ids, strict=True))
 
-    log.info("teach_finished", file_ids=file_ids, count=len(file_ids))
-    await message.reply_text(f"Danke! {len(file_ids)} Foto(s) empfangen. Wird geprüft....")
+    chat = update.effective_chat
+    assert chat is not None
+    n = len(file_ids)
+    log.info("teach_finished", file_ids=file_ids, count=n)
+    await message.reply_text(
+        f"Danke! {n} Foto{'s' if n > 1 else ''} empfangen. Ich schaue sie mir an..."
+    )
+
+    # --- Step 1: Triage ---
+    await chat.send_action(ChatAction.TYPING)
     try:
         base64_images = await download_photos_as_base64(context.bot, file_ids)
         triage_results = await triage_images(base64_images)
     except Exception:
         log.exception("teach_triage_failed")
         await message.reply_text(
-            "Beim prüfen der Fotos ist ein Fehler aufgetreten. Bitte versuche es später erneut."
+            "Beim Prüfen der Fotos ist ein Fehler aufgetreten. Bitte versuche es später erneut."
         )
         _clear_photo_data(context.user_data)
         return ConversationHandler.END
@@ -137,25 +146,26 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if rejected:
         log.info("teach_images_rejected", count=len(rejected))
         await message.reply_text(
-            f"{len(rejected)} Foto(s) sind kein Lernmaterial und wurden aussortiert."
+            f"{len(rejected)} Foto{'s' if len(rejected) > 1 else ''} "
+            "sehen nicht nach Lernmaterial aus — übersprungen."
         )
 
     if not valid:
         log.info("teach_all_rejected")
         await message.reply_text(
-            "Keines der Fotos enthält deutsches Lernmaterial. "
-            "Bitte versuche es mit Buchseiten oder Grammatik-Screenshots erneut (/teach)."
+            "Ich konnte leider kein deutsches Lernmaterial erkennen. "
+            "Versuche es mit Buchseiten oder Grammatik-Screenshots (/teach)."
         )
         _clear_photo_data(context.user_data)
         return ConversationHandler.END
 
     log.info("teach_triage_passed", valid=len(valid), categories=[r.category for r in valid])
-
     await message.reply_text(
-        f"Danke! {len(valid)} Foto(s) erkannt als Lernmaterial. Verarbeitung startet..."
+        f"{len(valid)} Seite{'n' if len(valid) > 1 else ''} erkannt. Ich lese jetzt den Inhalt..."
     )
 
-    # --- Extract content from valid images concurrently ---
+    # --- Step 2: Extract content ---
+    await chat.send_action(ChatAction.TYPING)
     b64_by_file_id = dict(base64_images)
     tasks = [extract_page(b64_by_file_id[r.file_id]) for r in valid]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -163,44 +173,64 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     extractions = []
     image_metadata = []
     failed_count = 0
+    empty_count = 0
     for r, result in zip(valid, results, strict=True):
         if isinstance(result, Exception):
             failed_count += 1
             log.error("teach_extraction_failed", file_id=r.file_id, error=repr(result))
+        elif not result.grammar_rules and not result.vocabulary:
+            empty_count += 1
+            log.warning("teach_extraction_empty", file_id=r.file_id, topic=result.topic)
         else:
             extractions.append(result)
             image_metadata.append((fid_to_uid[r.file_id], r.file_id))
             log.info("teach_extraction_ok", file_id=r.file_id, topic=result.topic)
 
-    if failed_count:
+    if failed_count or empty_count:
+        skipped_msgs = []
+        if failed_count:
+            skipped_msgs.append(f"{failed_count} fehlgeschlagen")
+        if empty_count:
+            skipped_msgs.append(f"{empty_count} ohne erkennbaren Inhalt")
+        await message.reply_text(f"Übersprungen: {', '.join(skipped_msgs)}.")
+
+    if not extractions:
         await message.reply_text(
-            f"{failed_count} Foto(s) konnten nicht verarbeitet werden und wurden übersprungen."
+            "Aus den Fotos konnte ich leider keinen Inhalt herauslesen. "
+            "Vielleicht ein schärferes Bild probieren?"
         )
+        _clear_photo_data(context.user_data)
+        return ConversationHandler.END
 
-    if extractions:
-        try:
-            source, rule_ids = await persist_extractions(extractions, image_metadata=image_metadata)
-            # Summarize findings
-            total_rules = sum(len(e.grammar_rules) for e in extractions)
-            total_vocab = sum(len(e.vocabulary) for e in extractions)
+    # --- Step 3: Persist + generate assignment ---
+    total_rules = sum(len(e.grammar_rules) for e in extractions)
+    total_vocab = sum(len(e.vocabulary) for e in extractions)
+    await message.reply_text(
+        f"{total_rules} Grammatikregel{'n' if total_rules != 1 else ''}"
+        f" und {total_vocab} Vokabeln gefunden. "
+        "Ich erstelle jetzt deine Übung..."
+    )
 
-            # Generate and save assignment
-            topic = extractions[0].topic
-            assignment_content = await generate_assignment(extractions, topic=topic)
-            assignment = await save_assignment(topic, assignment_content, rule_ids)
-            await message.reply_text(
-                f"Fertig! {total_rules} Grammatikregel(n) und {total_vocab} Vokabeln gespeichert.\n"
-                f"Übung #{assignment.id} wurde erstellt "
-                f"({sum(len(s.items) for s in assignment_content.sections)} Aufgaben)."
-            )
-            log.info("teach_persisted", source_id=source.id, assignment_id=assignment.id)
-        except Exception:
-            log.exception("teach_persist_failed")
-            await message.reply_text(
-                "Beim Speichern ist ein Fehler aufgetreten. Bitte versuche es erneut."
-            )
-    else:
-        await message.reply_text("Aus den Fotos konnte leider kein Inhalt extrahiert werden.")
+    await chat.send_action(ChatAction.TYPING)
+    try:
+        source, rule_ids = await persist_extractions(extractions, image_metadata=image_metadata)
+        topic = extractions[0].topic
+        assignment_content = await generate_assignment(extractions, topic=topic)
+        assignment = await save_assignment(topic, assignment_content, rule_ids)
+
+        item_count = sum(len(s.items) for s in assignment_content.sections)
+        section_count = len(assignment_content.sections)
+        await message.reply_text(
+            f"Fertig! Übung #{assignment.id} ist bereit: "
+            f"{section_count} Abschnitte mit {item_count} Aufgaben.\n\n"
+            f"Thema: {topic}"
+        )
+        log.info("teach_persisted", source_id=source.id, assignment_id=assignment.id)
+    except Exception:
+        log.exception("teach_persist_failed")
+        await message.reply_text(
+            "Beim Erstellen der Übung ist leider ein Fehler aufgetreten. Bitte versuche es erneut."
+        )
 
     _clear_photo_data(context.user_data)
     return ConversationHandler.END

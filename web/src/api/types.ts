@@ -7,9 +7,7 @@ export type SectionType =
 
 export interface AssignmentItem {
   question: string;
-  correct_answer: string;
   options: string[] | null;
-  hint: string | null;
 }
 
 export interface AssignmentSection {
@@ -37,8 +35,40 @@ export interface AssignmentDetail {
   type: string;
   topic: string;
   content: AssignmentContent;
-  grammar_rule_ids: number[];
   source: string;
-  sent_at: string | null;
   created_at: string;
+}
+
+// --- Submission types ---
+
+export interface SectionAnswers {
+  items: string[];
+}
+
+export interface SubmissionAnswers {
+  sections: SectionAnswers[];
+}
+
+export interface ItemFeedback {
+  correct: boolean;
+  user_answer: string;
+  correct_answer: string;
+  hint: string | null;
+}
+
+export interface SectionFeedback {
+  items: ItemFeedback[];
+}
+
+export interface SubmissionFeedback {
+  sections: SectionFeedback[];
+}
+
+export interface SubmissionResult {
+  id: number;
+  assignment_id: number;
+  score: number;
+  max_score: number;
+  feedback: SubmissionFeedback;
+  submitted_at: string;
 }

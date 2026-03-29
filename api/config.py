@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_allowed_chat_id: str = ""
     telegram_webhook_base_url: str = ""  # e.g. https://abc123.ngrok-free.app
+    web_base_url: str = ""  # e.g. http://localhost:5173
     anthropic_api_key: str = ""
     openai_api_key: str = ""  # OPENAI_API_KEY
     default_model: str = "claude-haiku-4-5-20251001"

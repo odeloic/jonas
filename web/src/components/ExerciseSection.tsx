@@ -3,9 +3,17 @@ import ExerciseItem from "./ExerciseItem";
 
 interface ExerciseSectionProps {
   section: AssignmentSection;
+  answers: string[];
+  onAnswerChange: (itemIndex: number, value: string) => void;
+  disabled: boolean;
 }
 
-export default function ExerciseSection({ section }: ExerciseSectionProps) {
+export default function ExerciseSection({
+  section,
+  answers,
+  onAnswerChange,
+  disabled,
+}: ExerciseSectionProps) {
   return (
     <section className="space-y-3">
       <div>
@@ -18,6 +26,9 @@ export default function ExerciseSection({ section }: ExerciseSectionProps) {
           item={item}
           sectionType={section.type}
           index={i + 1}
+          value={answers[i] ?? ""}
+          onChange={(v) => onAnswerChange(i, v)}
+          disabled={disabled}
         />
       ))}
     </section>

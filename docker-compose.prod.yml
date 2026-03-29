@@ -2,6 +2,25 @@ services:
   api:
     restart: unless-stopped
     ports: !reset []
+    volumes: !reset
+      - media-data:/var/jonas/media
+    command: ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    env_file: .env
+    depends_on:
+      - api
+    networks:
+      - jonas-network
 
   postgres:
     restart: unless-stopped
@@ -14,3 +33,7 @@ services:
   qdrant:
     restart: unless-stopped
     ports: !reset []
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -54,7 +54,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await message.reply_text(MSG_RECEIVED)
 
 
-async def start_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start_generate_assignment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert context.user_data is not None
     message = update.effective_message
     if message is None:
@@ -63,7 +63,9 @@ async def start_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data[KEY_PHOTO_FILE_IDS] = []
     context.user_data[KEY_PHOTO_UNIQUE_IDS] = []
-    await message.reply_text("Schicke mir deine Fotos! Wenn du fertig bist, sende /done")
+    await message.reply_text(
+        'Schicke mir deine Fotos! Wenn du fertig bist, schreib einfach "fertig" oder "done".'
+    )
 
     return WAITING_FOR_PHOTOS
 
@@ -94,7 +96,9 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     unique_ids = context.user_data.get(KEY_PHOTO_UNIQUE_IDS, [])
 
     if not file_ids:
-        await message.reply_text("Du hast keine Fotos geschickt. Bitte starte mit /teach erneut.")
+        await message.reply_text(
+            "Du hast keine Fotos geschickt. Bitte starte mit /generate_assignment erneut."
+        )
         return ConversationHandler.END
 
     # --- Dedup check: skip already-processed images ---
@@ -157,7 +161,7 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.info("teach_all_rejected")
         await message.reply_text(
             "Ich konnte leider kein deutsches Lernmaterial erkennen. "
-            "Versuche es mit Buchseiten oder Grammatik-Screenshots (/teach)."
+            "Versuche es mit Buchseiten oder Grammatik-Screenshots (/generate_assignment)."
         )
         _clear_photo_data(context.user_data)
         return ConversationHandler.END
@@ -270,15 +274,20 @@ async def timeout_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log.info("teach_timed_out")
 
 
+_DONE_PATTERN = r"^\s*(done|fertig|ok|k|klar|finished|complete|let'?s\s+go)\s*$"
+
+_DONE_FILTER = filters.Regex(_DONE_PATTERN) & filters.TEXT
+
+
 def build_app():
     app = ApplicationBuilder().token(settings.telegram_bot_token).updater(None).build()
 
     teach_conv = ConversationHandler(
-        entry_points=[CommandHandler("teach", start_teach)],
+        entry_points=[CommandHandler("generate_assignment", start_generate_assignment)],
         states={
             WAITING_FOR_PHOTOS: [
                 MessageHandler(filters.PHOTO, collect_photo),
-                CommandHandler("done", finish_teach),
+                MessageHandler(_DONE_FILTER, finish_teach),
             ],
             ConversationHandler.TIMEOUT: [
                 MessageHandler(filters.ALL, timeout_teach),

@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     qdrant_collection: str = "grammar_rules"
     embedding_model: str = "text-embedding-3-small"
     qdrant_similarity_threshold: float = 0.92
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "http://localhost:3000"
+    langfuse_enabled: bool = True
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

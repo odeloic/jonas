@@ -51,6 +51,7 @@ async def extract_page(b64_image: str) -> PageExtraction:
             response_format=PageExtraction,
             model=settings.extraction_model,
             max_tokens=16384,
+            trace_name="extraction",
         )
     ).parsed
 

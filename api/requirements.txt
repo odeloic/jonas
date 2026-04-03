@@ -11,6 +11,7 @@ sqlalchemy[asyncio]
 asyncpg
 alembic
 qdrant-client
+langfuse>=2.0,<3.0
 
 # dev
 ruff

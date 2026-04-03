@@ -85,6 +85,7 @@ async def generate_assignment(
             response_format=AssignmentContent,
             model=settings.assignment_model,
             max_tokens=4096,
+            trace_name="assignment_generation",
         )
     ).parsed
 

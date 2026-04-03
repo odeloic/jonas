@@ -1,0 +1,12 @@
+[
+  {
+    "id": "gc-001",
+    "question": "Fülle die Lücke: Ich ___ gestern ins Kino gegangen. (gehen)",
+    "correct_answer": "bin",
+    "cases": [
+      {"student_answer": "bin", "expected_score_min": 0.9},
+      {"student_answer": "habe", "expected_score_min": 0.0, "expected_score_max": 0.3},
+      {"student_answer": "war gegangen", "expected_score_min": 0.1, "expected_score_max": 0.5}
+    ]
+  }
+]

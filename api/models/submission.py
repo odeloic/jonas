@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,3 +21,7 @@ class AssignmentSubmission(Base):
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    telegram_message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    langfuse_trace_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    flagged_for_review: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    flagged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -14,8 +14,15 @@ _JUDGE_SYSTEM_PROMPT = """\
 Du bist ein Experte für die deutsche Sprache und bewertest Schülerantworten.
 
 Entscheide, ob die Schülerantwort inhaltlich korrekt ist (is_correct: true oder false).
-Semantisch gleichwertige Antworten gelten als korrekt — zum Beispiel gültige V2-Umstellungen,
-Perfekt statt Präteritum in gesprochen-deutschem Kontext, oder bedeutungsgleiche Konnektoren.
+Semantisch gleichwertige Antworten gelten als korrekt — zum Beispiel gültige V2-Umstellungen
+oder Perfekt statt Präteritum in gesprochen-deutschem Kontext.
+
+Wichtig bei Konnektoren: Koordinierende Konjunktionen (denn, aber, oder, und, sondern) und
+subordinierende Konjunktionen (weil, da, obwohl, wenn, dass …) sind NICHT austauschbar,
+auch wenn sie inhaltlich ähnlich sind. Sie verlangen unterschiedliche Wortstellungen.
+Wenn die Satzstruktur in der Frage bereits eine bestimmte Wortstellung vorgibt (z. B.
+Verbendstellung im Nebensatz), ist nur der passende Konjunktionstyp korrekt.
+
 Gib außerdem eine Punktzahl von 0.0 (völlig falsch) bis 1.0 (vollständig korrekt)
 und eine kurze Begründung auf Deutsch.
 """

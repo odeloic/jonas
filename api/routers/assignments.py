@@ -65,6 +65,23 @@ class SubmitRequest(BaseModel):
     answers: SubmissionAnswers
 
 
+# --- Helpers ---
+
+
+async def _send_and_store_tg_result(
+    submission_id: int,
+    chat_id: str,
+    text: str,
+    bot,
+) -> None:
+    sent = await bot.send_message(chat_id=chat_id, text=text)
+    async with async_session() as session:
+        async with session.begin():
+            sub = await session.get(AssignmentSubmission, submission_id)
+            if sub:
+                sub.telegram_message_id = str(sent.message_id)
+
+
 # --- Endpoints ---
 
 
@@ -166,9 +183,11 @@ async def submit_assignment(assignment_id: int, body: SubmitRequest, request: Re
             tg_text += f"\n\nDetails: {results_url}"
 
         asyncio.create_task(
-            tg_app.bot.send_message(
+            _send_and_store_tg_result(
+                submission_id=submission_id,
                 chat_id=settings.telegram_allowed_chat_id,
                 text=tg_text,
+                bot=tg_app.bot,
             )
         )
 

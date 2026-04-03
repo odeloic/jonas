@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 
 import structlog
+from sqlalchemy import select
 from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import (
@@ -10,12 +11,14 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     MessageHandler,
+    MessageReactionHandler,
     filters,
 )
 
 from config import settings
 from db import async_session
 from models.assignment import Assignment
+from models.submission import AssignmentSubmission
 from models.triage import ImageCategory
 from services.assignment import generate_assignment, save_assignment
 from services.content_extraction import extract_page
@@ -279,6 +282,69 @@ _DONE_PATTERN = r"^\s*(done|fertig|ok|k|klar|finished|complete|let'?s\s+go)\s*$"
 _DONE_FILTER = filters.Regex(_DONE_PATTERN) & filters.TEXT
 
 
+def _queue_to_langfuse_dataset(submission: AssignmentSubmission) -> None:
+    """Add a flagged submission's trace to the grading-feedback dataset in Langfuse."""
+    if not settings.langfuse_enabled or not settings.langfuse_public_key:
+        return
+    from langfuse import Langfuse  # noqa: PLC0415
+
+    lf = Langfuse(
+        public_key=settings.langfuse_public_key,
+        secret_key=settings.langfuse_secret_key,
+        host=settings.langfuse_host,
+    )
+    lf.create_dataset_item(
+        dataset_name="grading-feedback",
+        input={"submission_id": submission.id, "langfuse_trace_id": submission.langfuse_trace_id},
+        expected_output=None,
+        metadata={
+            "submission_id": submission.id,
+            "flagged_at": submission.flagged_at.isoformat() if submission.flagged_at else None,
+        },
+    )
+    lf.flush()
+
+
+async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle Telegram message reactions — 👎 flags the submission for review."""
+    reaction = update.message_reaction
+    if reaction is None:
+        return
+    if not is_correct_chat(reaction.chat.id):
+        return
+
+    thumbs_down = any(
+        getattr(r, "emoji", None) == "\U0001f44e" for r in (reaction.new_reaction or [])
+    )
+    if not thumbs_down:
+        return
+
+    message_id = str(reaction.message_id)
+    async with async_session() as session:
+        async with session.begin():
+            stmt = select(AssignmentSubmission).where(
+                AssignmentSubmission.telegram_message_id == message_id
+            )
+            result = await session.execute(stmt)
+            submission = result.scalar_one_or_none()
+
+            if submission is None:
+                log.info("reaction_no_submission_found", message_id=message_id)
+                return
+
+            submission.flagged_for_review = True
+            submission.flagged_at = datetime.now(UTC)
+
+    if submission.langfuse_trace_id:
+        _queue_to_langfuse_dataset(submission)
+
+    await context.bot.send_message(
+        chat_id=reaction.chat.id,
+        text="Notiert. Ich lerne daraus.",
+    )
+    log.info("submission_flagged", submission_id=submission.id)
+
+
 def build_app():
     app = ApplicationBuilder().token(settings.telegram_bot_token).updater(None).build()
 
@@ -298,5 +364,6 @@ def build_app():
     )
 
     app.add_handler(teach_conv)
+    app.add_handler(MessageReactionHandler(handle_reaction))
     app.add_handler(MessageHandler(filters.ALL, handle_message))
     return app

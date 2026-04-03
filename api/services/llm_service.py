@@ -30,6 +30,7 @@ class LLMResult[T]:
     finish_reason: str | None = None
     model: str = ""
     wall_clock_seconds: float = 0.0
+    trace_id: str | None = None
 
 
 class LLMService:
@@ -89,10 +90,10 @@ class LLMService:
         trace_name: str | None,
         messages: list[dict],
         result: "LLMResult",
-    ) -> None:
+    ) -> str | None:
         lf = self._get_langfuse()
         if lf is None or trace_name is None:
-            return
+            return None
         trace = lf.trace(name=trace_name)  # type: ignore[union-attr]
         trace.generation(
             name=trace_name,
@@ -105,6 +106,7 @@ class LLMService:
                 "wall_clock_seconds": result.wall_clock_seconds,
             },
         )
+        return trace.id
 
     @staticmethod
     def _is_anthropic(model: str) -> bool:
@@ -176,7 +178,9 @@ class LLMService:
             result = await self._anthropic_structured(chosen, messages, response_format, max_tokens)
         else:
             result = await self._openai_structured(chosen, messages, response_format, max_tokens)
-        self._track_generation(trace_name=trace_name, messages=messages, result=result)
+        result.trace_id = self._track_generation(
+            trace_name=trace_name, messages=messages, result=result
+        )
         return result
 
     async def _anthropic_structured[T: PydanticBaseModel](
@@ -306,7 +310,9 @@ class LLMService:
             result = await self._anthropic_complete(chosen, messages, max_tokens)
         else:
             result = await self._openai_complete(chosen, messages, max_tokens)
-        self._track_generation(trace_name=trace_name, messages=messages, result=result)
+        result.trace_id = self._track_generation(
+            trace_name=trace_name, messages=messages, result=result
+        )
         return result
 
     async def _anthropic_complete(

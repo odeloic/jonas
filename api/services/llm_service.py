@@ -30,6 +30,7 @@ class LLMResult[T]:
     finish_reason: str | None = None
     model: str = ""
     wall_clock_seconds: float = 0.0
+    trace_id: str | None = None
 
 
 class LLMService:
@@ -38,6 +39,7 @@ class LLMService:
     def __init__(self) -> None:
         self._anthropic: anthropic.AsyncAnthropic | None = None
         self._openai: openai.AsyncOpenAI | None = None
+        self._langfuse: object | None = None  # langfuse.Langfuse, imported lazily
 
     def _get_anthropic(self) -> anthropic.AsyncAnthropic:
         if self._anthropic is None:
@@ -48,6 +50,63 @@ class LLMService:
         if self._openai is None:
             self._openai = openai.AsyncOpenAI(api_key=settings.openai_api_key)
         return self._openai
+
+    def _get_langfuse(self) -> object | None:
+        if not settings.langfuse_enabled:
+            return None
+        if self._langfuse is None:
+            if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+                return None
+            from langfuse import Langfuse  # noqa: PLC0415
+
+            self._langfuse = Langfuse(
+                public_key=settings.langfuse_public_key,
+                secret_key=settings.langfuse_secret_key,
+                host=settings.langfuse_host,
+            )
+        return self._langfuse
+
+    @staticmethod
+    def _sanitize_messages_for_langfuse(messages: list[dict]) -> list[dict]:
+        """Replace base64 image data with a placeholder so Langfuse doesn't try to upload blobs."""
+        sanitized = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                clean_blocks = []
+                for block in content:
+                    if block.get("type") in ("image_url", "image"):
+                        clean_blocks.append({"type": block["type"], "source": "[image omitted]"})
+                    else:
+                        clean_blocks.append(block)
+                sanitized.append({**msg, "content": clean_blocks})
+            else:
+                sanitized.append(msg)
+        return sanitized
+
+    def _track_generation(
+        self,
+        *,
+        trace_name: str | None,
+        messages: list[dict],
+        result: "LLMResult",
+    ) -> str | None:
+        lf = self._get_langfuse()
+        if lf is None or trace_name is None:
+            return None
+        trace = lf.trace(name=trace_name)  # type: ignore[union-attr]
+        trace.generation(
+            name=trace_name,
+            model=result.model,
+            input=self._sanitize_messages_for_langfuse(messages),
+            output=result.raw_response,
+            usage={"input": result.input_tokens, "output": result.output_tokens},
+            metadata={
+                "finish_reason": result.finish_reason,
+                "wall_clock_seconds": result.wall_clock_seconds,
+            },
+        )
+        return trace.id
 
     @staticmethod
     def _is_anthropic(model: str) -> bool:
@@ -112,11 +171,17 @@ class LLMService:
         response_format: type[T],
         model: str | None = None,
         max_tokens: int = 4096,
+        trace_name: str | None = None,
     ) -> LLMResult[T]:
         chosen = model or settings.default_model
         if self._is_anthropic(chosen):
-            return await self._anthropic_structured(chosen, messages, response_format, max_tokens)
-        return await self._openai_structured(chosen, messages, response_format, max_tokens)
+            result = await self._anthropic_structured(chosen, messages, response_format, max_tokens)
+        else:
+            result = await self._openai_structured(chosen, messages, response_format, max_tokens)
+        result.trace_id = self._track_generation(
+            trace_name=trace_name, messages=messages, result=result
+        )
+        return result
 
     async def _anthropic_structured[T: PydanticBaseModel](
         self,
@@ -238,11 +303,17 @@ class LLMService:
         messages: list[dict],
         model: str | None = None,
         max_tokens: int = 1024,
+        trace_name: str | None = None,
     ) -> LLMResult[str]:
         chosen = model or settings.default_model
         if self._is_anthropic(chosen):
-            return await self._anthropic_complete(chosen, messages, max_tokens)
-        return await self._openai_complete(chosen, messages, max_tokens)
+            result = await self._anthropic_complete(chosen, messages, max_tokens)
+        else:
+            result = await self._openai_complete(chosen, messages, max_tokens)
+        result.trace_id = self._track_generation(
+            trace_name=trace_name, messages=messages, result=result
+        )
+        return result
 
     async def _anthropic_complete(
         self,

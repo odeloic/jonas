@@ -1,3 +1,7 @@
 {$DOMAIN} {
 	reverse_proxy api:8000
 }
+
+{$LANGFUSE_DOMAIN} {
+	reverse_proxy langfuse:3000
+}

@@ -60,6 +60,7 @@ async def triage_images(
             response_format=TriageResponse,
             model=settings.triage_model,
             max_tokens=512,
+            trace_name="triage",
         )
     ).parsed
 

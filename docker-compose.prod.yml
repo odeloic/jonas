@@ -34,6 +34,12 @@ services:
     restart: unless-stopped
     ports: !reset []
 
+  langfuse:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      NEXTAUTH_URL: https://${LANGFUSE_DOMAIN}
+
 volumes:
   caddy-data:
   caddy-config:

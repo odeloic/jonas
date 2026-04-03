@@ -20,6 +20,10 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["config", "logging_config", "models", "routers", "services"]
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true

@@ -1,3 +1,5 @@
+import asyncio
+
 import structlog
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -44,12 +46,14 @@ async def search_grammar_rules(text: str, top_k: int = 3) -> list[dict]:
     try:
         client = get_client()
         vector = await embed_text(text)
-        hits = client.query_points(
+        query_result = await asyncio.to_thread(
+            client.query_points,
             collection_name=settings.qdrant_collection,
             query=vector,
             limit=top_k,
             score_threshold=0.5,
-        ).points
+        )
+        hits = query_result.points
 
         results = []
         for hit in hits:
@@ -89,12 +93,14 @@ async def upsert_grammar_rule(
     chunk_text = _build_chunk_text(topic, rule_name, explanation, examples)
     vector = await embed_text(chunk_text)
 
-    hits = client.query_points(
+    query_result = await asyncio.to_thread(
+        client.query_points,
         collection_name=settings.qdrant_collection,
         query=vector,
         limit=1,
         score_threshold=settings.qdrant_similarity_threshold,
-    ).points
+    )
+    hits = query_result.points
 
     if hits:
         existing = hits[0]
@@ -109,7 +115,8 @@ async def upsert_grammar_rule(
             )
             merged_vector = await embed_text(merged_text)
 
-            client.upsert(
+            await asyncio.to_thread(
+                client.upsert,
                 collection_name=settings.qdrant_collection,
                 points=[
                     PointStruct(
@@ -135,7 +142,8 @@ async def upsert_grammar_rule(
             return {"action": "merged", "point_id": existing.id}
 
     # No duplicates found - create new point
-    client.upsert(
+    await asyncio.to_thread(
+        client.upsert,
         collection_name=settings.qdrant_collection,
         points=[
             PointStruct(

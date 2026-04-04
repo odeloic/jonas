@@ -1,4 +1,6 @@
 import asyncio
+import re
+import time
 from datetime import UTC, datetime
 
 import structlog
@@ -18,19 +20,45 @@ from telegram.ext import (
 from config import settings
 from db import async_session
 from models.assignment import Assignment
+from models.correction import CorrectionResult
+from models.intent import Intent
 from models.learner_profile import LearnerProfile
 from models.submission import AssignmentSubmission
 from models.triage import ImageCategory
 from services.assignment import generate_assignment, save_assignment
 from services.content_extraction import extract_page
+from services.correction import answer_question, correct_german_text
 from services.ingestion import check_processed_images, persist_extractions
+from services.intent import classify_intent
+from services.learner_profile import update_after_practice
+from services.qdrant import search_grammar_rules
 from services.vision_triage import download_photos_as_base64, triage_images
+from utils.telegram_format import format_correction, md_to_telegram
 
 log = structlog.get_logger()
 
 WAITING_FOR_PHOTOS = 0
 KEY_PHOTO_FILE_IDS = "photo_file_ids"
 KEY_PHOTO_UNIQUE_IDS = "photo_unique_ids"
+
+# Practice session tracking keys
+KEY_PRACTICE_COUNT = "practice_count"
+KEY_PRACTICE_TOPICS = "practice_topics"
+KEY_PRACTICE_LAST_TS = "practice_last_ts"
+
+SESSION_GAP_SECONDS = 600  # 10 minutes
+
+_EMOJI_RE = r"^[\s\U0001f600-\U0001f64f\U0001f44d\U0001f44e\u2764\ufe0f\U0001f389\U0001f525]*$"
+_SHORT_RE = (
+    r"^(ok|lol|ja|nein|nö|gut|cool|nice|thanks|thx|danke"
+    r"|hi|hey|hallo|bye|tschüss|ciao|k|kk|sure|yep|yup|nope|hmm|mhm|aha)$"
+)
+_TRIVIAL_PATTERN = re.compile(rf"{_EMOJI_RE}|{_SHORT_RE}", re.IGNORECASE)
+
+
+def _is_trivial(text: str) -> bool:
+    """Fast check for messages that are obviously IGNORE — avoids an LLM call."""
+    return bool(_TRIVIAL_PATTERN.match(text))
 
 
 def _msg_start_first() -> str:
@@ -67,8 +95,8 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if existing:
         await message.reply_text(
             "Willkommen zurück! Du bist bereits registriert.\n\n"
-            f"Schicke mir Fotos aus deinem Lehrbuch mit /{teach} —\n"
-            "ich erstelle daraus Übungen für dich."
+            "Schreib mir einfach auf Deutsch und ich korrigiere dich!\n"
+            f"Oder schicke mir Fotos aus deinem Lehrbuch mit /{teach}."
         )
         return
 
@@ -81,11 +109,57 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await message.reply_text(
         "Hallo! Ich bin Jonas, dein Deutsch-Tutor.\n\n"
         "So funktioniert's:\n"
-        f"1. Schicke mir Fotos aus deinem Lehrbuch mit /{teach}\n"
-        "2. Ich lese den Inhalt und erstelle eine Übung\n"
-        "3. Du bearbeitest die Übung und bekommst Feedback\n\n"
-        f"Lass uns loslegen! Schicke /{teach}, um zu beginnen."
+        "1. Schreib mir einfach auf Deutsch — ich korrigiere deine Fehler\n"
+        "2. Stell mir Fragen zur Grammatik — ich erkläre es dir\n"
+        f"3. Schicke mir Fotos aus deinem Lehrbuch mit /{teach} für Übungen\n\n"
+        "Lass uns loslegen! Schreib mir einen deutschen Satz."
     )
+
+
+async def _reply_markdown(message, text: str) -> None:
+    """Send MarkdownV2 reply, falling back to plain text if Telegram rejects it."""
+    try:
+        await message.reply_text(text, parse_mode="MarkdownV2")
+    except Exception:
+        log.warning("markdown_fallback", text_preview=text[:80])
+        # Strip markdown markers and send as plain text
+        plain = re.sub(r"[\\*_`]", "", text)
+        await message.reply_text(plain)
+
+
+def _format_correction(result: CorrectionResult) -> str:
+    """Format a CorrectionResult as MarkdownV2 for Telegram."""
+    return format_correction(
+        has_error=result.has_error,
+        corrected=result.corrected,
+        error_type=result.error_type,
+        explanation=result.explanation,
+        follow_up=result.follow_up,
+    )
+
+
+async def _flush_practice_session(chat_id: str, user_data: dict) -> str | None:
+    """Flush accumulated practice session data. Returns summary text or None."""
+    count = user_data.get(KEY_PRACTICE_COUNT, 0)
+    topics = user_data.get(KEY_PRACTICE_TOPICS, [])
+    unique_topics = list(dict.fromkeys(topics))  # dedupe preserving order
+
+    summary = None
+    if count > 0:
+        topic_text = ", ".join(unique_topics) if unique_topics else "keine besonderen"
+        summary = (
+            f"📊 Letzte Übung: {count} {'Satz' if count == 1 else 'Sätze'} geübt.\n"
+            f"Themen: {topic_text}\n"
+            "Weiter so! 💪"
+        )
+
+    if unique_topics:
+        await update_after_practice(chat_id, unique_topics)
+
+    user_data.pop(KEY_PRACTICE_COUNT, None)
+    user_data.pop(KEY_PRACTICE_TOPICS, None)
+    user_data.pop(KEY_PRACTICE_LAST_TS, None)
+    return summary
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -98,7 +172,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(_msg_start_first())
         return
 
-    log.info("message_received", chat_id=chat.id, text=message.text)
+    user_text = (message.text or "").strip()
+    if not user_text or _is_trivial(user_text):
+        return
+
+    assert context.user_data is not None
+    chat_id = str(chat.id)
+
+    # Check for session gap — flush previous session if >10 min
+    last_ts = context.user_data.get(KEY_PRACTICE_LAST_TS)
+    if last_ts and (time.time() - last_ts) > SESSION_GAP_SECONDS:
+        summary = await _flush_practice_session(chat_id, context.user_data)
+        if summary:
+            await message.reply_text(summary)
+
+    result = await classify_intent(user_text)
+    log.info("message_routed", chat_id=chat.id, intent=result.intent, text=user_text[:50])
+
+    if result.intent == Intent.PRACTICE:
+        await chat.send_action(ChatAction.TYPING)
+        rules = await search_grammar_rules(user_text, top_k=3)
+        correction = await correct_german_text(user_text, rules)
+
+        # Track session
+        context.user_data[KEY_PRACTICE_COUNT] = context.user_data.get(KEY_PRACTICE_COUNT, 0) + 1
+        if correction.has_error and correction.error_type:
+            topics = context.user_data.get(KEY_PRACTICE_TOPICS, [])
+            topics.append(correction.error_type)
+            context.user_data[KEY_PRACTICE_TOPICS] = topics
+        context.user_data[KEY_PRACTICE_LAST_TS] = time.time()
+
+        reply = _format_correction(correction)
+        await _reply_markdown(message, reply)
+
+    elif result.intent == Intent.QUESTION:
+        await chat.send_action(ChatAction.TYPING)
+        rules = await search_grammar_rules(user_text, top_k=3)
+        answer = await answer_question(user_text, rules)
+        await _reply_markdown(message, md_to_telegram(answer))
 
 
 async def start_generate_assignment(update: Update, context: ContextTypes.DEFAULT_TYPE):

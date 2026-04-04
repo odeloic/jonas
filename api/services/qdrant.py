@@ -1,3 +1,5 @@
+import asyncio
+
 import structlog
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -35,6 +37,42 @@ async def embed_text(text: str) -> list[float]:
     return await _llm.embed(text)
 
 
+async def search_grammar_rules(text: str, top_k: int = 3) -> list[dict]:
+    """Search Qdrant for grammar rules semantically similar to the user's text.
+
+    Returns a list of payload dicts ({topic, rule_name, explanation, examples}).
+    Returns [] on any failure (Qdrant down, embedding error, etc.).
+    """
+    try:
+        client = get_client()
+        vector = await embed_text(text)
+        query_result = await asyncio.to_thread(
+            client.query_points,
+            collection_name=settings.qdrant_collection,
+            query=vector,
+            limit=top_k,
+            score_threshold=0.5,
+        )
+        hits = query_result.points
+
+        results = []
+        for hit in hits:
+            if hit.payload is not None:
+                results.append(
+                    {
+                        "topic": hit.payload.get("topic", ""),
+                        "rule_name": hit.payload.get("rule_name", ""),
+                        "explanation": hit.payload.get("explanation", ""),
+                        "examples": hit.payload.get("examples", []),
+                    }
+                )
+        log.info("qdrant_search", query_len=len(text), results=len(results))
+        return results
+    except Exception:
+        log.exception("qdrant_search_failed")
+        return []
+
+
 def _build_chunk_text(topic: str, rule_name: str, explanation: str, examples: list[str]) -> str:
     """Build a single text chunk from a grammar rule for embedding"""
     parts = [f"Thema: {topic}", f"Regel: {rule_name}", f"Erklärung: {explanation}"]
@@ -55,12 +93,14 @@ async def upsert_grammar_rule(
     chunk_text = _build_chunk_text(topic, rule_name, explanation, examples)
     vector = await embed_text(chunk_text)
 
-    hits = client.query_points(
+    query_result = await asyncio.to_thread(
+        client.query_points,
         collection_name=settings.qdrant_collection,
         query=vector,
         limit=1,
         score_threshold=settings.qdrant_similarity_threshold,
-    ).points
+    )
+    hits = query_result.points
 
     if hits:
         existing = hits[0]
@@ -75,7 +115,8 @@ async def upsert_grammar_rule(
             )
             merged_vector = await embed_text(merged_text)
 
-            client.upsert(
+            await asyncio.to_thread(
+                client.upsert,
                 collection_name=settings.qdrant_collection,
                 points=[
                     PointStruct(
@@ -101,7 +142,8 @@ async def upsert_grammar_rule(
             return {"action": "merged", "point_id": existing.id}
 
     # No duplicates found - create new point
-    client.upsert(
+    await asyncio.to_thread(
+        client.upsert,
         collection_name=settings.qdrant_collection,
         points=[
             PointStruct(

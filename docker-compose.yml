@@ -9,11 +9,17 @@ services:
       - ./api:/app
       - media-data:/var/jonas/media
     env_file: .env
+    environment:
+      # Override .env default (localhost:3000) — inside Docker, Langfuse is
+      # reachable via the service name. Local pytest keeps the .env default.
+      LANGFUSE_HOST: http://langfuse:3000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      langfuse:
+        condition: service_started
     networks:
       - jonas-network
     restart: unless-stopped

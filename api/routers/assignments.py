@@ -145,7 +145,9 @@ async def submit_assignment(assignment_id: int, body: SubmitRequest, request: Re
         if len(answers.items) != len(section.items):
             raise HTTPException(status_code=422, detail=f"Item count mismatch in section {i}")
 
-    score, max_score, feedback = score_submission(content, body.answers)
+    score, max_score, feedback, langfuse_trace_id = await score_submission(
+        content, body.answers, request.app.state.llm
+    )
 
     async with async_session() as session:
         async with session.begin():
@@ -155,6 +157,7 @@ async def submit_assignment(assignment_id: int, body: SubmitRequest, request: Re
                 score=score,
                 max_score=max_score,
                 feedback=feedback.model_dump(),
+                langfuse_trace_id=langfuse_trace_id,
             )
             session.add(submission)
             await session.flush()

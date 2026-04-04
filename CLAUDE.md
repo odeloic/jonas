@@ -98,6 +98,22 @@ Config is in `api/pyproject.toml`. Pre-commit hooks run ruff automatically on ev
 
 CI runs `ruff check .` and `ruff format --check .` on push/PR via `.github/workflows/lint.yml`.
 
+## Evals
+
+Evals run locally (not in Docker) — pytest and test deps live in `api/tests/requirements-test.txt`.
+
+```bash
+cd api
+source .venv/bin/activate
+python -m pytest tests/evals/test_grading_eval.py -v -s
+```
+
+Requires API keys in `.env` (ANTHROPIC_API_KEY, optionally LANGFUSE_* for trace logging).
+
+Acceptance bar:
+- **False positive rate = 0%** (hard assert — clearly wrong answers must never pass)
+- **False negative rate ≤ 15%** (soft warn — semantically correct answers that fail)
+
 ## API module layout
 
 ```

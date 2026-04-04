@@ -43,6 +43,28 @@ async def update_after_submission(
         log.exception("learner_profile_update_failed", chat_id=chat_id)
 
 
+async def update_after_practice(chat_id: str, topics_corrected: list[str]) -> None:
+    """Lightweight profile update after a practice session — tracks weak topics and streak only."""
+    if not topics_corrected:
+        return
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                profile = await _get_or_create(session, chat_id)
+                _update_streak(profile)
+                topic_errors = {topic: 1 for topic in topics_corrected}
+                profile.weak_topics = _merge_weak_topics(profile.weak_topics or {}, topic_errors)
+
+        log.info(
+            "practice_profile_updated",
+            chat_id=chat_id,
+            topics=topics_corrected,
+            streak=profile.streak_days,
+        )
+    except Exception:
+        log.exception("practice_profile_update_failed", chat_id=chat_id)
+
+
 async def _get_or_create(session, chat_id: str) -> LearnerProfile:
     result = await session.execute(
         select(LearnerProfile).where(LearnerProfile.telegram_chat_id == chat_id)
@@ -72,6 +94,24 @@ def _update_streak(profile: LearnerProfile) -> None:
     profile.last_active_date = today
 
 
+def _merge_weak_topics(current: dict, topic_errors: dict[str, int]) -> dict:
+    """Merge error counts into weak_topics dict and cap at MAX_WEAK_TOPICS."""
+    weak = dict(current)
+    today_str = str(date.today())
+
+    for topic, count in topic_errors.items():
+        entry = weak.get(topic, {"error_count": 0, "last_seen": today_str})
+        entry["error_count"] = entry["error_count"] + count
+        entry["last_seen"] = today_str
+        weak[topic] = entry
+
+    if len(weak) > MAX_WEAK_TOPICS:
+        sorted_topics = sorted(weak.items(), key=lambda x: x[1]["error_count"], reverse=True)
+        weak = dict(sorted_topics[:MAX_WEAK_TOPICS])
+
+    return weak
+
+
 async def _update_weak_topics(
     session, profile: LearnerProfile, submission: AssignmentSubmission, assignment: Assignment
 ) -> None:
@@ -90,24 +130,11 @@ async def _update_weak_topics(
         return
 
     topics = {r.topic for r in rules}
-    weak = dict(profile.weak_topics or {})
-    today_str = str(date.today())
-
-    for topic in topics:
-        entry = weak.get(topic, {"error_count": 0, "last_seen": today_str})
-        wrong_count = sum(
-            1 for section in feedback.sections for item in section.items if not item.correct
-        )
-        entry["error_count"] = entry["error_count"] + wrong_count
-        entry["last_seen"] = today_str
-        weak[topic] = entry
-
-    # Cap at MAX_WEAK_TOPICS, keep highest error counts
-    if len(weak) > MAX_WEAK_TOPICS:
-        sorted_topics = sorted(weak.items(), key=lambda x: x[1]["error_count"], reverse=True)
-        weak = dict(sorted_topics[:MAX_WEAK_TOPICS])
-
-    profile.weak_topics = weak
+    wrong_count = sum(
+        1 for section in feedback.sections for item in section.items if not item.correct
+    )
+    topic_errors = {topic: wrong_count for topic in topics}
+    profile.weak_topics = _merge_weak_topics(profile.weak_topics or {}, topic_errors)
 
 
 async def _update_cefr_estimate(session, profile: LearnerProfile, chat_id: str) -> None:

@@ -35,6 +35,40 @@ async def embed_text(text: str) -> list[float]:
     return await _llm.embed(text)
 
 
+async def search_grammar_rules(text: str, top_k: int = 3) -> list[dict]:
+    """Search Qdrant for grammar rules semantically similar to the user's text.
+
+    Returns a list of payload dicts ({topic, rule_name, explanation, examples}).
+    Returns [] on any failure (Qdrant down, embedding error, etc.).
+    """
+    try:
+        client = get_client()
+        vector = await embed_text(text)
+        hits = client.query_points(
+            collection_name=settings.qdrant_collection,
+            query=vector,
+            limit=top_k,
+            score_threshold=0.5,
+        ).points
+
+        results = []
+        for hit in hits:
+            if hit.payload is not None:
+                results.append(
+                    {
+                        "topic": hit.payload.get("topic", ""),
+                        "rule_name": hit.payload.get("rule_name", ""),
+                        "explanation": hit.payload.get("explanation", ""),
+                        "examples": hit.payload.get("examples", []),
+                    }
+                )
+        log.info("qdrant_search", query_len=len(text), results=len(results))
+        return results
+    except Exception:
+        log.exception("qdrant_search_failed")
+        return []
+
+
 def _build_chunk_text(topic: str, rule_name: str, explanation: str, examples: list[str]) -> str:
     """Build a single text chunk from a grammar rule for embedding"""
     parts = [f"Thema: {topic}", f"Regel: {rule_name}", f"Erklärung: {explanation}"]

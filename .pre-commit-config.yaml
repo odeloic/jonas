@@ -5,3 +5,11 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: unit-tests
+        name: unit tests
+        entry: bash -c 'cd api && source .venv/bin/activate && python -m pytest tests/unit/ -q'
+        language: system
+        pass_filenames: false
+        always_run: true

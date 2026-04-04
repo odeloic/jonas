@@ -1,0 +1,218 @@
+[
+  {
+    "id": "practice_001",
+    "input": "Gestern ich bin ins Kino gegangen.",
+    "expected_intent": "PRACTICE",
+    "note": "German sentence with word order error"
+  },
+  {
+    "id": "practice_002",
+    "input": "Ich gehe morgen zur Schule.",
+    "expected_intent": "PRACTICE",
+    "note": "Correct German sentence"
+  },
+  {
+    "id": "practice_003",
+    "input": "Die Kinder haben im Garten gespielt.",
+    "expected_intent": "PRACTICE",
+    "note": "Correct German sentence — Perfekt"
+  },
+  {
+    "id": "practice_004",
+    "input": "Ich habe ein Film gesehen.",
+    "expected_intent": "PRACTICE",
+    "note": "Akkusativ error (ein → einen)"
+  },
+  {
+    "id": "practice_005",
+    "input": "Weil ich bin müde, gehe ich ins Bett.",
+    "expected_intent": "PRACTICE",
+    "note": "Subordinate clause word order error"
+  },
+  {
+    "id": "practice_006",
+    "input": "Er hat mir ein Buch gegeben und ich habe es gelesen.",
+    "expected_intent": "PRACTICE",
+    "note": "Complex correct sentence"
+  },
+  {
+    "id": "practice_007",
+    "input": "Wenn ich Zeit hätte, würde ich nach Berlin fahren.",
+    "expected_intent": "PRACTICE",
+    "note": "Konjunktiv II — correct"
+  },
+  {
+    "id": "practice_008",
+    "input": "Ich muss heute viel arbeiten weil ich habe morgen frei.",
+    "expected_intent": "PRACTICE",
+    "note": "Missing comma and word order error after weil"
+  },
+  {
+    "id": "practice_009",
+    "input": "Das Buch, das ich gelesen habe, war sehr interessant.",
+    "expected_intent": "PRACTICE",
+    "note": "Correct relative clause"
+  },
+  {
+    "id": "practice_010",
+    "input": "Ich freue mich auf dem Wochenende.",
+    "expected_intent": "PRACTICE",
+    "note": "Preposition error (auf + Akk for future)"
+  },
+  {
+    "id": "practice_011",
+    "input": "Meine Schwester und ich sind gestern in der Stadt gewesen.",
+    "expected_intent": "PRACTICE",
+    "note": "Correct sentence"
+  },
+  {
+    "id": "practice_012",
+    "input": "Nachdem ich gegessen habe, bin ich spazieren gegangen.",
+    "expected_intent": "PRACTICE",
+    "note": "Correct temporal clause"
+  },
+  {
+    "id": "question_001",
+    "input": "Wie funktioniert der Dativ?",
+    "expected_intent": "QUESTION",
+    "note": "Grammar question in German"
+  },
+  {
+    "id": "question_002",
+    "input": "When do I use Akkusativ vs Dativ?",
+    "expected_intent": "QUESTION",
+    "note": "Grammar question in English"
+  },
+  {
+    "id": "question_003",
+    "input": "Was ist der Unterschied zwischen weil und obwohl?",
+    "expected_intent": "QUESTION",
+    "note": "Grammar comparison question"
+  },
+  {
+    "id": "question_004",
+    "input": "Kannst du mir die Adjektivdeklination erklären?",
+    "expected_intent": "QUESTION",
+    "note": "Request for explanation"
+  },
+  {
+    "id": "question_005",
+    "input": "What's the difference between Präteritum and Perfekt?",
+    "expected_intent": "QUESTION",
+    "note": "English question about German tenses"
+  },
+  {
+    "id": "question_006",
+    "input": "Wann benutzt man den Konjunktiv II?",
+    "expected_intent": "QUESTION",
+    "note": "Grammar usage question"
+  },
+  {
+    "id": "question_007",
+    "input": "How do I form the passive voice in German?",
+    "expected_intent": "QUESTION",
+    "note": "English grammar question"
+  },
+  {
+    "id": "question_008",
+    "input": "Welche Präpositionen brauchen den Dativ?",
+    "expected_intent": "QUESTION",
+    "note": "Specific grammar question"
+  },
+  {
+    "id": "question_009",
+    "input": "Dativ?",
+    "expected_intent": "QUESTION",
+    "note": "Single word with question mark"
+  },
+  {
+    "id": "question_010",
+    "input": "Can you explain Wechselpräpositionen?",
+    "expected_intent": "QUESTION",
+    "note": "Mixed language question"
+  },
+  {
+    "id": "ignore_001",
+    "input": "ok",
+    "expected_intent": "IGNORE",
+    "note": "Short acknowledgement"
+  },
+  {
+    "id": "ignore_002",
+    "input": "lol",
+    "expected_intent": "IGNORE",
+    "note": "Informal reaction"
+  },
+  {
+    "id": "ignore_003",
+    "input": "👍",
+    "expected_intent": "IGNORE",
+    "note": "Emoji only"
+  },
+  {
+    "id": "ignore_004",
+    "input": "hi",
+    "expected_intent": "IGNORE",
+    "note": "Greeting"
+  },
+  {
+    "id": "ignore_005",
+    "input": "thanks",
+    "expected_intent": "IGNORE",
+    "note": "English acknowledgement"
+  },
+  {
+    "id": "ignore_006",
+    "input": "danke",
+    "expected_intent": "IGNORE",
+    "note": "German acknowledgement"
+  },
+  {
+    "id": "ignore_007",
+    "input": "what's up",
+    "expected_intent": "IGNORE",
+    "note": "English small talk"
+  },
+  {
+    "id": "ignore_008",
+    "input": "hallo",
+    "expected_intent": "IGNORE",
+    "note": "German greeting"
+  },
+  {
+    "id": "ignore_009",
+    "input": "ja",
+    "expected_intent": "IGNORE",
+    "note": "Short confirmation"
+  },
+  {
+    "id": "ignore_010",
+    "input": "cool",
+    "expected_intent": "IGNORE",
+    "note": "Informal reaction"
+  },
+  {
+    "id": "ignore_011",
+    "input": "I just had pizza for lunch",
+    "expected_intent": "IGNORE",
+    "note": "English off-topic"
+  },
+  {
+    "id": "ignore_012",
+    "input": "😂😂😂",
+    "expected_intent": "IGNORE",
+    "note": "Multiple emojis"
+  },
+  {
+    "id": "ignore_013",
+    "input": "gut",
+    "expected_intent": "IGNORE",
+    "note": "Single-word German acknowledgement"
+  },
+  {
+    "id": "ignore_014",
+    "input": "nein",
+    "expected_intent": "IGNORE",
+    "note": "Single-word negation"
+  }
+]

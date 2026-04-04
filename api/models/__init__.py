@@ -1,5 +1,6 @@
 from models.assignment import Assignment
 from models.grammar_rule import GrammarRule
+from models.learner_profile import LearnerProfile
 from models.processed_image import ProcessedImage
 from models.source import Source
 from models.submission import AssignmentSubmission
@@ -9,6 +10,7 @@ __all__ = [
     "Assignment",
     "AssignmentSubmission",
     "GrammarRule",
+    "LearnerProfile",
     "ProcessedImage",
     "Source",
     "VocabularyItem",

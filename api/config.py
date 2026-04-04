@@ -15,8 +15,9 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://redis:6379"
     telegram_bot_token: str = ""
-    telegram_allowed_chat_id: str = ""
     telegram_webhook_base_url: str = ""  # e.g. https://abc123.ngrok-free.app
+    telegram_start_command: str = "start"
+    telegram_teach_command: str = "teach"
     web_base_url: str = ""  # e.g. http://localhost:5173
     anthropic_api_key: str = ""
     openai_api_key: str = ""  # OPENAI_API_KEY

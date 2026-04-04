@@ -16,6 +16,7 @@ from models.assignment_schema import (
     SubmissionResult,
 )
 from models.submission import AssignmentSubmission
+from services.learner_profile import update_after_submission
 from services.scoring import score_submission
 
 router = APIRouter(prefix="/api/assignments", tags=["assignments"])
@@ -170,9 +171,19 @@ async def submit_assignment(assignment_id: int, body: SubmitRequest, request: Re
         max_score=max_score,
     )
 
+    # ODE-320: update learner profile
+    if assignment.telegram_chat_id:
+        asyncio.create_task(
+            update_after_submission(
+                chat_id=assignment.telegram_chat_id,
+                submission=submission,
+                assignment=assignment,
+            )
+        )
+
     # ODE-258: push results to Telegram
     tg_app = getattr(request.app.state, "tg_app", None)
-    if tg_app and settings.telegram_allowed_chat_id:
+    if tg_app and assignment.telegram_chat_id:
         error_count = max_score - score
         tg_text = (
             f"Übung #{assignment_id} abgegeben!\n\n"
@@ -188,7 +199,7 @@ async def submit_assignment(assignment_id: int, body: SubmitRequest, request: Re
         asyncio.create_task(
             _send_and_store_tg_result(
                 submission_id=submission_id,
-                chat_id=settings.telegram_allowed_chat_id,
+                chat_id=assignment.telegram_chat_id,
                 text=tg_text,
                 bot=tg_app.bot,
             )

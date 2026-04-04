@@ -18,15 +18,13 @@ from telegram.ext import (
 from config import settings
 from db import async_session
 from models.assignment import Assignment
+from models.learner_profile import LearnerProfile
 from models.submission import AssignmentSubmission
 from models.triage import ImageCategory
 from services.assignment import generate_assignment, save_assignment
 from services.content_extraction import extract_page
 from services.ingestion import check_processed_images, persist_extractions
 from services.vision_triage import download_photos_as_base64, triage_images
-
-MSG_UNAUTHORIZED = "Unauthorized"
-MSG_RECEIVED = "Received"
 
 log = structlog.get_logger()
 
@@ -35,13 +33,59 @@ KEY_PHOTO_FILE_IDS = "photo_file_ids"
 KEY_PHOTO_UNIQUE_IDS = "photo_unique_ids"
 
 
+def _msg_start_first() -> str:
+    cmd = settings.telegram_start_command
+    return f"Bitte starte zuerst mit /{cmd}, damit ich dich kennenlernen kann."
+
+
 def _clear_photo_data(user_data: dict) -> None:
     user_data.pop(KEY_PHOTO_FILE_IDS, None)
     user_data.pop(KEY_PHOTO_UNIQUE_IDS, None)
 
 
-def is_correct_chat(chat_id: int | str) -> bool:
-    return str(chat_id) == settings.telegram_allowed_chat_id
+async def _has_profile(chat_id: int | str) -> bool:
+    async with async_session() as session:
+        result = await session.scalar(
+            select(LearnerProfile.id).where(LearnerProfile.telegram_chat_id == str(chat_id))
+        )
+        return result is not None
+
+
+async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    message = update.effective_message
+    if chat is None or message is None:
+        return
+
+    chat_id = str(chat.id)
+    async with async_session() as session:
+        existing = await session.scalar(
+            select(LearnerProfile.id).where(LearnerProfile.telegram_chat_id == chat_id)
+        )
+
+    teach = settings.telegram_teach_command
+    if existing:
+        await message.reply_text(
+            "Willkommen zurück! Du bist bereits registriert.\n\n"
+            f"Schicke mir Fotos aus deinem Lehrbuch mit /{teach} —\n"
+            "ich erstelle daraus Übungen für dich."
+        )
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            profile = LearnerProfile(telegram_chat_id=chat_id)
+            session.add(profile)
+
+    log.info("learner_profile_created", chat_id=chat_id)
+    await message.reply_text(
+        "Hallo! Ich bin Jonas, dein Deutsch-Tutor.\n\n"
+        "So funktioniert's:\n"
+        f"1. Schicke mir Fotos aus deinem Lehrbuch mit /{teach}\n"
+        "2. Ich lese den Inhalt und erstelle eine Übung\n"
+        "3. Du bearbeitest die Übung und bekommst Feedback\n\n"
+        f"Lass uns loslegen! Schicke /{teach}, um zu beginnen."
+    )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -49,12 +93,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     if chat is None or message is None:
         return
-    if not is_correct_chat(chat.id):
-        await message.reply_text(MSG_UNAUTHORIZED)
+
+    if not await _has_profile(chat.id):
+        await message.reply_text(_msg_start_first())
         return
 
     log.info("message_received", chat_id=chat.id, text=message.text)
-    await message.reply_text(MSG_RECEIVED)
 
 
 async def start_generate_assignment(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,7 +106,14 @@ async def start_generate_assignment(update: Update, context: ContextTypes.DEFAUL
     message = update.effective_message
     if message is None:
         return ConversationHandler.END
-    log.info("teach_started", chat_id=update.effective_chat.id if update.effective_chat else None)
+
+    chat = update.effective_chat
+    if chat is None or not await _has_profile(chat.id):
+        if message:
+            await message.reply_text(_msg_start_first())
+        return ConversationHandler.END
+
+    log.info("teach_started", chat_id=chat.id)
 
     context.user_data[KEY_PHOTO_FILE_IDS] = []
     context.user_data[KEY_PHOTO_UNIQUE_IDS] = []
@@ -98,9 +149,10 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_ids = context.user_data.get(KEY_PHOTO_FILE_IDS, [])
     unique_ids = context.user_data.get(KEY_PHOTO_UNIQUE_IDS, [])
 
+    teach = settings.telegram_teach_command
     if not file_ids:
         await message.reply_text(
-            "Du hast keine Fotos geschickt. Bitte starte mit /generate_assignment erneut."
+            f"Du hast keine Fotos geschickt. Bitte starte mit /{teach} erneut."
         )
         return ConversationHandler.END
 
@@ -164,7 +216,7 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.info("teach_all_rejected")
         await message.reply_text(
             "Ich konnte leider kein deutsches Lernmaterial erkennen. "
-            "Versuche es mit Buchseiten oder Grammatik-Screenshots (/generate_assignment)."
+            f"Versuche es mit Buchseiten oder Grammatik-Screenshots (/{teach})."
         )
         _clear_photo_data(context.user_data)
         return ConversationHandler.END
@@ -226,7 +278,9 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
         source, rule_ids = await persist_extractions(extractions, image_metadata=image_metadata)
         topic = extractions[0].topic
         assignment_content = await generate_assignment(extractions, topic=topic)
-        assignment = await save_assignment(topic, assignment_content, rule_ids)
+        assignment = await save_assignment(
+            topic, assignment_content, rule_ids, telegram_chat_id=str(chat.id)
+        )
 
         item_count = sum(len(s.items) for s in assignment_content.sections)
         section_count = len(assignment_content.sections)
@@ -310,7 +364,7 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     reaction = update.message_reaction
     if reaction is None:
         return
-    if not is_correct_chat(reaction.chat.id):
+    if not await _has_profile(reaction.chat.id):
         return
 
     thumbs_down = any(
@@ -349,7 +403,9 @@ def build_app():
     app = ApplicationBuilder().token(settings.telegram_bot_token).updater(None).build()
 
     teach_conv = ConversationHandler(
-        entry_points=[CommandHandler("generate_assignment", start_generate_assignment)],
+        entry_points=[
+            CommandHandler(settings.telegram_teach_command, start_generate_assignment),
+        ],
         states={
             WAITING_FOR_PHOTOS: [
                 MessageHandler(filters.PHOTO, collect_photo),
@@ -363,6 +419,7 @@ def build_app():
         conversation_timeout=300,
     )
 
+    app.add_handler(CommandHandler(settings.telegram_start_command, handle_start))
     app.add_handler(teach_conv)
     app.add_handler(MessageReactionHandler(handle_reaction))
     app.add_handler(MessageHandler(filters.ALL, handle_message))

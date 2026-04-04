@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 import models.assignment  # noqa: F401
 import models.grammar_rule  # noqa: F401
+import models.learner_profile  # noqa: F401
 import models.processed_image  # noqa: F401
 import models.source  # noqa: F401
 import models.submission  # noqa: F401

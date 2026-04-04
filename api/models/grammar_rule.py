@@ -25,6 +25,7 @@ class GrammarRule(Base):
     source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"))
     source_type: Mapped[str] = mapped_column(String(20), default="INGESTED")
     verified: Mapped[bool] = mapped_column(default=False)
+    cefr_level: Mapped[str | None] = mapped_column(String(3), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     source: Mapped[Source] = relationship(back_populates="grammar_rules")

@@ -30,7 +30,7 @@ from services.content_extraction import extract_page
 from services.correction import answer_question, correct_german_text
 from services.ingestion import check_processed_images, persist_extractions
 from services.intent import classify_intent
-from services.learner_profile import update_after_practice
+from services.learner_profile import get_profile, update_after_practice
 from services.qdrant import search_grammar_rules
 from services.vision_triage import download_photos_as_base64, triage_images
 from utils.telegram_format import format_correction, md_to_telegram
@@ -386,9 +386,14 @@ async def finish_teach(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await chat.send_action(ChatAction.TYPING)
     try:
-        source, rule_ids = await persist_extractions(extractions, image_metadata=image_metadata)
+        (source, rule_ids), profile = await asyncio.gather(
+            persist_extractions(extractions, image_metadata=image_metadata),
+            get_profile(str(chat.id)),
+        )
         topic = extractions[0].topic
-        assignment_content = await generate_assignment(extractions, topic=topic)
+        assignment_content = await generate_assignment(
+            extractions, topic=topic, learner_profile=profile
+        )
         assignment = await save_assignment(
             topic, assignment_content, rule_ids, telegram_chat_id=str(chat.id)
         )

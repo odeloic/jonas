@@ -103,6 +103,7 @@ async def save_assignment(
     topic: str,
     content: AssignmentContent,
     grammar_rule_ids: list[int],
+    telegram_chat_id: str | None = None,
 ) -> AssignmentRow:
     """Persist assignment to Postgres"""
     async with async_session() as session:
@@ -112,6 +113,7 @@ async def save_assignment(
                 topic=topic,
                 content=content.model_dump(),
                 grammar_rule_ids=grammar_rule_ids,
+                telegram_chat_id=telegram_chat_id,
                 source="TEACH",
             )
             session.add(row)

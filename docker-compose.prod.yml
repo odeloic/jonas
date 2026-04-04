@@ -19,6 +19,7 @@ services:
     env_file: .env
     depends_on:
       - api
+      - langfuse
     networks:
       - jonas-network
 

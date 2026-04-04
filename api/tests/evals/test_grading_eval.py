@@ -14,7 +14,7 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
-from tests.evals.judges.grading_judge import JudgeResult, judge_answer
+from services.grading_judge import JudgeResult, judge_answer
 
 FN_RATE_THRESHOLD = 0.15
 DATASET_PATH = Path(__file__).parent / "datasets" / "grading_cases.json"

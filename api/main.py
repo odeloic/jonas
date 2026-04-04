@@ -15,6 +15,7 @@ from routers.spa import router as spa_router
 from routers.stats import router as stats_router
 from routers.vocabulary import router as vocabulary_router
 from routers.webhooks import router as webhooks_router
+from services.llm_service import LLMService
 
 
 @asynccontextmanager
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     log.info("telegram_webhook_set", url=webhook_url)
 
     app.state.tg_app = tg_app
+    app.state.llm = LLMService()
 
     yield
 

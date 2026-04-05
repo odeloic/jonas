@@ -5,6 +5,7 @@ from db import async_session
 from models.assignment import Assignment as AssignmentRow
 from models.assignment_schema import AssignmentContent
 from models.extraction import PageExtraction
+from models.learner_profile import LearnerProfile
 from services.llm_service import LLMService
 
 log = structlog.get_logger()
@@ -58,13 +59,35 @@ def _format_rules_context(extractions: list[PageExtraction]) -> str:
     return "\n".join(parts)
 
 
+def _format_learner_context(profile: LearnerProfile) -> str:
+    """Build a German-language learner context block for the system prompt."""
+    weak = profile.weak_topics or {}
+    sorted_weak = sorted(weak.items(), key=lambda x: x[1]["error_count"], reverse=True)[:3]
+    weak_lines = ", ".join(f"{t} ({d['error_count']} Fehler)" for t, d in sorted_weak)
+
+    return (
+        f"\nLernerprofil:\n"
+        f"- Geschätztes Niveau: {profile.cefr_estimate}\n"
+        f"- Schwache Themen (häufige Fehler): {weak_lines or 'keine'}\n"
+        f"\nBerücksichtige:\n"
+        f"- Erstelle mehr Aufgaben zu den schwachen Themen.\n"
+        f"- Passe die Schwierigkeit an das Niveau ({profile.cefr_estimate}) an.\n"
+        f"- Reduziere Aufgaben zu bereits beherrschten Themen.\n"
+    )
+
+
 async def generate_assignment(
     extractions: list[PageExtraction],
     topic: str | None = None,
+    learner_profile: LearnerProfile | None = None,
 ) -> AssignmentContent:
     """Generate a structured assignment from extracted grammar rules."""
     rules_context = _format_rules_context(extractions)
     resolved_topic = topic or extractions[0].topic
+
+    system_prompt = ASSIGNMENT_SYSTEM_PROMPT
+    if learner_profile and learner_profile.weak_topics:
+        system_prompt += _format_learner_context(learner_profile)
 
     user_content = (
         f"Erstelle Übungen zum Thema: {resolved_topic}\n\nGrammatikregeln:\n{rules_context}"
@@ -79,7 +102,7 @@ async def generate_assignment(
     result = (
         await _llm.complete_structured(
             messages=[
-                {"role": "system", "content": ASSIGNMENT_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
             ],
             response_format=AssignmentContent,

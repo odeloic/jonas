@@ -18,6 +18,15 @@ CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
 MAX_WEAK_TOPICS = 10
 
 
+async def get_profile(chat_id: str) -> LearnerProfile | None:
+    """Fetch learner profile for a chat, or None if not yet created."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(LearnerProfile).where(LearnerProfile.telegram_chat_id == chat_id)
+        )
+        return result.scalar_one_or_none()
+
+
 async def update_after_submission(
     chat_id: str,
     submission: AssignmentSubmission,

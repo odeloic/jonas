@@ -5,6 +5,7 @@ from db import async_session
 from models.assignment import Assignment as AssignmentRow
 from models.assignment_schema import AssignmentContent
 from models.extraction import PageExtraction
+from models.grammar_rule import GrammarRule as GrammarRuleRow
 from models.learner_profile import LearnerProfile
 from services.llm_service import LLMService
 
@@ -122,11 +123,68 @@ async def generate_assignment(
     return result
 
 
+def _format_db_rules_context(rules: list[GrammarRuleRow]) -> str:
+    """Format DB GrammarRule rows as plain-text context for the LLM."""
+    parts = []
+    for rule in rules:
+        parts.append(f"## Thema: {rule.topic}")
+        parts.append(f"### {rule.rule_name}")
+        parts.append(rule.explanation)
+        if rule.pattern:
+            parts.append(f"Muster: {rule.pattern}")
+        if rule.examples:
+            parts.append("Beispiele: " + " | ".join(rule.examples))
+        parts.append("")
+    return "\n".join(parts)
+
+
+async def generate_assignment_from_rules(
+    rules: list[GrammarRuleRow],
+    topic: str | None = None,
+    learner_profile: LearnerProfile | None = None,
+) -> AssignmentContent:
+    """Generate assignment from DB grammar rules (no PageExtraction needed)."""
+    rules_context = _format_db_rules_context(rules)
+    resolved_topic = topic or rules[0].topic
+
+    system_prompt = ASSIGNMENT_SYSTEM_PROMPT
+    if learner_profile and learner_profile.weak_topics:
+        system_prompt += _format_learner_context(learner_profile)
+
+    user_content = (
+        f"Erstelle Übungen zum Thema: {resolved_topic}\n\nGrammatikregeln:\n{rules_context}"
+    )
+
+    result = (
+        await _llm.complete_structured(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            response_format=AssignmentContent,
+            model=settings.assignment_model,
+            max_tokens=4096,
+            trace_name="assignment_generation_from_rules",
+        )
+    ).parsed
+
+    log.info(
+        "assignment_generated_from_rules",
+        topic=resolved_topic,
+        sections=len(result.sections),
+        total_items=sum(len(s.items) for s in result.sections),
+        rule_count=len(rules),
+    )
+
+    return result
+
+
 async def save_assignment(
     topic: str,
     content: AssignmentContent,
     grammar_rule_ids: list[int],
     telegram_chat_id: str | None = None,
+    source: str = "TEACH",
 ) -> AssignmentRow:
     """Persist assignment to Postgres"""
     async with async_session() as session:
@@ -137,9 +195,9 @@ async def save_assignment(
                 content=content.model_dump(),
                 grammar_rule_ids=grammar_rule_ids,
                 telegram_chat_id=telegram_chat_id,
-                source="TEACH",
+                source=source,
             )
             session.add(row)
             await session.flush()
-    log.info("assignment_saved", assignment_id=row.id, topic=topic)
+    log.info("assignment_saved", assignment_id=row.id, topic=topic, source=source)
     return row

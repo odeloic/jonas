@@ -34,6 +34,16 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "http://localhost:3000"
     langfuse_enabled: bool = True
+    # Daily flashcard cron
+    flashcard_daily_count: int = 5
+    flashcard_hour_utc: int = 8
+    flashcard_minute_utc: int = 0
+
+    # Weekly assignment cron
+    weekly_assignment_day: int = 0  # 0=Monday, 6=Sunday
+    weekly_assignment_hour_utc: int = 9
+    weekly_assignment_minute_utc: int = 0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

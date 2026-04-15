@@ -2,6 +2,7 @@ import asyncio
 import re
 import time
 from datetime import UTC, datetime
+from datetime import time as dt_time
 
 import structlog
 from sqlalchemy import select
@@ -539,4 +540,34 @@ def build_app():
     app.add_handler(teach_conv)
     app.add_handler(MessageReactionHandler(handle_reaction))
     app.add_handler(MessageHandler(filters.ALL, handle_message))
+
+    # --- Scheduled jobs ---
+    if app.job_queue is not None:
+        from services.flashcard import send_daily_flashcards  # noqa: PLC0415
+        from services.weekly_assignment import send_weekly_assignments  # noqa: PLC0415
+
+        app.job_queue.run_daily(
+            send_daily_flashcards,
+            time=dt_time(
+                hour=settings.flashcard_hour_utc,
+                minute=settings.flashcard_minute_utc,
+            ),
+            name="daily_flashcards",
+        )
+        app.job_queue.run_daily(
+            send_weekly_assignments,
+            time=dt_time(
+                hour=settings.weekly_assignment_hour_utc,
+                minute=settings.weekly_assignment_minute_utc,
+            ),
+            days=(settings.weekly_assignment_day,),
+            name="weekly_assignment",
+        )
+        log.info(
+            "jobs_scheduled",
+            flashcard_time=f"{settings.flashcard_hour_utc:02d}:{settings.flashcard_minute_utc:02d}",
+            weekly_day=settings.weekly_assignment_day,
+            weekly_time=f"{settings.weekly_assignment_hour_utc:02d}:{settings.weekly_assignment_minute_utc:02d}",
+        )
+
     return app

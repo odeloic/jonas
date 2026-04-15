@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
@@ -10,6 +11,7 @@ from config import settings
 from db import async_session
 from models.extraction import VocabularyItem as VocabularyItemSchema
 from models.flashcard_log import FlashcardLog
+from models.flashcard_set import FlashcardSet
 from models.learner_profile import LearnerProfile
 from models.source import Source
 from models.vocabulary_item import VocabularyItem
@@ -130,6 +132,19 @@ async def _log_flashcards_sent(chat_id: str, vocab_ids: list[int]) -> None:
                 session.add(FlashcardLog(telegram_chat_id=chat_id, vocabulary_item_id=vid))
 
 
+async def _save_flashcard_set(chat_id: str, vocab_ids: list[int]) -> FlashcardSet:
+    """Persist a flashcard set and return the row."""
+    async with async_session() as session:
+        async with session.begin():
+            fset = FlashcardSet(
+                telegram_chat_id=chat_id,
+                vocabulary_item_ids=vocab_ids,
+            )
+            session.add(fset)
+            await session.flush()
+    return fset
+
+
 async def send_daily_flashcards(context: ContextTypes.DEFAULT_TYPE) -> None:
     """JobQueue callback: send daily flashcards to all registered learners."""
     count = settings.flashcard_daily_count
@@ -161,15 +176,36 @@ async def send_daily_flashcards(context: ContextTypes.DEFAULT_TYPE) -> None:
                 log.info("flashcard_cron_no_vocab", chat_id=chat_id)
                 continue
 
-            text = format_flashcard_message(items)
+            vocab_ids = [item.id for item in items]
+
+            # Save flashcard set for web view
+            fset = await _save_flashcard_set(chat_id, vocab_ids)
+
+            # Send link via Telegram
+            text = (
+                f"\U0001f4da Deine täglichen Vokabeln sind da! "
+                f"{len(items)} {'Wort' if len(items) == 1 else 'Wörter'} zum Lernen."
+            )
+            if settings.web_base_url:
+                url = f"{settings.web_base_url}/flashcards/{fset.id}"
+                text += f"\n\nHier lernen: {url}"
+
             await context.bot.send_message(chat_id=chat_id, text=text)
 
-            await _log_flashcards_sent(chat_id, [item.id for item in items])
+            # Mark set as sent
+            async with async_session() as session:
+                async with session.begin():
+                    row = await session.get(FlashcardSet, fset.id)
+                    if row:
+                        row.sent_at = datetime.now(UTC)
+
+            # Log individual items for repeat prevention
+            await _log_flashcards_sent(chat_id, vocab_ids)
             log.info(
                 "flashcard_cron_sent",
                 chat_id=chat_id,
+                set_id=fset.id,
                 total=len(items),
-                from_db=len(items) - max(0, count - len(items)),
             )
         except Exception:
             log.exception("flashcard_cron_failed", chat_id=chat_id)

@@ -82,6 +82,34 @@ export interface AssignmentDetail {
   created_at: string;
 }
 
+// --- Flashcard types ---
+
+export interface FlashcardItem {
+  id: number;
+  word: string;
+  article: string | null;
+  plural: string | null;
+  word_class: string;
+  definition_de: string | null;
+  definition_en: string | null;
+  example_sentence: string | null;
+}
+
+export interface FlashcardSetSummary {
+  id: number;
+  telegram_chat_id: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface FlashcardSetDetail {
+  id: number;
+  telegram_chat_id: string;
+  items: FlashcardItem[];
+  sent_at: string | null;
+  created_at: string;
+}
+
 // --- Submission types ---
 
 export interface SectionAnswers {

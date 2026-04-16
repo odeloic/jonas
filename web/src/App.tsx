@@ -6,6 +6,7 @@ import Vocabulary from "./pages/Vocabulary";
 import Assignments from "./pages/Assignments";
 import AssignmentDetail from "./pages/AssignmentDetail";
 import AssignmentResults from "./pages/AssignmentResults";
+import FlashcardDetail from "./pages/FlashcardDetail";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
               path="/assignments/:id/results/:submissionId"
               element={<AssignmentResults />}
             />
+            <Route path="/flashcards/:id" element={<FlashcardDetail />} />
           </Routes>
         </main>
       </div>

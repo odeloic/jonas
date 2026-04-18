@@ -72,6 +72,30 @@
     "note": "Correct temporal clause"
   },
   {
+    "id": "practice_013",
+    "input": "Hallo Judith, wie geht's dir? Über morgen, weiß oder rot Wein?",
+    "expected_intent": "PRACTICE",
+    "note": "Greeting prefix + German sentences with errors — must not be IGNORE"
+  },
+  {
+    "id": "practice_014",
+    "input": "Hi! Ich habe gestern ein Film gesehen.",
+    "expected_intent": "PRACTICE",
+    "note": "Greeting prefix + practice content (Akkusativ error)"
+  },
+  {
+    "id": "practice_015",
+    "input": "Hallo, ich möchte Deutsch lernen.",
+    "expected_intent": "PRACTICE",
+    "note": "Greeting + German sentence"
+  },
+  {
+    "id": "question_011",
+    "input": "hallo?",
+    "expected_intent": "QUESTION",
+    "note": "Single word with question mark — nudge/attention-check, not IGNORE"
+  },
+  {
     "id": "question_001",
     "input": "Wie funktioniert der Dativ?",
     "expected_intent": "QUESTION",

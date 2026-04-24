@@ -1,0 +1,181 @@
+[
+  {
+    "id": "gen_001_genitiv",
+    "topic": "Genitiv mit bestimmtem Artikel",
+    "grammar_rules": [
+      {
+        "rule_name": "Genitiv — bestimmter Artikel",
+        "explanation": "Der Genitiv zeigt Besitz oder Zugehörigkeit. Maskulin/Neutrum: des + Nomen-(e)s. Feminin/Plural: der + Nomen.",
+        "pattern": "des/der/des/der + Nomen(-s/-es bei m/n)",
+        "examples": [
+          "das Auto des Vaters",
+          "die Farbe der Blume",
+          "der Preis des Autos",
+          "die Räder der Autos"
+        ]
+      }
+    ],
+    "stresses": ["negative_mc_framing", "hint_matches_correct_answer"],
+    "note": "Reproduces the bug from 2026-04-21. The generator tends to produce 'Welche Variante ist NICHT korrekt?' MCs whose correct_answer is the ungrammatical phrase, with a hint that explains grammar in a way that seems to validate the student's (rejected) choice."
+  },
+  {
+    "id": "gen_002_perfekt_haben_sein",
+    "topic": "Perfekt mit haben oder sein",
+    "grammar_rules": [
+      {
+        "rule_name": "Hilfsverb im Perfekt",
+        "explanation": "Bewegungsverben (gehen, fahren, fliegen) und Zustandsänderungen (aufwachen, einschlafen) bilden das Perfekt mit 'sein'. Die meisten anderen Verben mit 'haben'.",
+        "pattern": "haben/sein + Partizip II",
+        "examples": [
+          "Ich bin ins Kino gegangen.",
+          "Sie hat das Buch gelesen.",
+          "Wir sind früh aufgewacht."
+        ]
+      }
+    ],
+    "stresses": ["ambiguous_correct_answer", "multiple_valid_answers"],
+    "note": "Perfekt items risk storing only one valid auxiliary when both are defensible (e.g. regional 'gesessen haben/sein'). Also exposes generator temptation to mix tenses in one COMPLETION where both Perfekt and Präteritum are correct."
+  },
+  {
+    "id": "gen_003_konjunktiv2_hoeflich",
+    "topic": "Konjunktiv II für höfliche Bitten",
+    "grammar_rules": [
+      {
+        "rule_name": "Konjunktiv II — Umschreibung mit würden",
+        "explanation": "Für höfliche Bitten/Wünsche wird der Konjunktiv II verwendet. Bei den meisten Verben: würde + Infinitiv. Bei haben/sein/Modalverben: eigene Formen (hätte, wäre, könnte, müsste).",
+        "pattern": "würde + Infinitiv / hätte / wäre / könnte",
+        "examples": [
+          "Ich würde gerne einen Kaffee bestellen.",
+          "Hätten Sie einen Moment Zeit?",
+          "Könnten Sie mir helfen?"
+        ]
+      }
+    ],
+    "stresses": ["ambiguous_correct_answer", "blank_marker_present"],
+    "note": "Höflichkeitsformen have multiple correct realizations ('würden bestellen' vs 'bestellen würden' vs 'möchte bestellen'). Generator must not lock in one arbitrary form when others are equally valid."
+  },
+  {
+    "id": "gen_004_passiv_vorgang",
+    "topic": "Vorgangspassiv im Präsens",
+    "grammar_rules": [
+      {
+        "rule_name": "Vorgangspassiv",
+        "explanation": "Das Vorgangspassiv beschreibt einen Vorgang. Es wird mit werden + Partizip II gebildet. Der Akkusativ des Aktivsatzes wird zum Subjekt.",
+        "pattern": "werden (konjugiert) + Partizip II",
+        "examples": [
+          "Das Haus wird gebaut.",
+          "Die Briefe werden geschrieben.",
+          "Der Kuchen wird gegessen."
+        ]
+      }
+    ],
+    "stresses": ["reorder_word_bag", "punctuation_drift"],
+    "note": "REORDER for Passiv often has the generator introduce/remove a period or capitalization between question (shuffled) and correct_answer (solved), which makes the word-bag invariant fail."
+  },
+  {
+    "id": "gen_005_adjektivdekl_schwach",
+    "topic": "Adjektivdeklination nach bestimmtem Artikel (schwache Deklination)",
+    "grammar_rules": [
+      {
+        "rule_name": "Schwache Adjektivendungen",
+        "explanation": "Nach bestimmtem Artikel (der/die/das) bekommt das Adjektiv im Nominativ -e, in allen anderen Fällen -en. Ausnahme: Nominativ feminin/neutral.",
+        "pattern": "der/die/das + Adjektiv + -e / -en",
+        "examples": [
+          "der rote Apfel",
+          "die schöne Blume",
+          "mit dem roten Apfel"
+        ]
+      }
+    ],
+    "stresses": ["short_answer_exact_match", "blank_marker_present"],
+    "note": "Single-token answers ('-e', '-en', 'rote', 'roten') — these were historically flagged as false negatives by the semantic judge on exact matches. Post-fix, exact matches short-circuit; this case regression-tests that the generator emits unambiguous single-form correct_answers."
+  },
+  {
+    "id": "gen_006_nebensatz_weil",
+    "topic": "Nebensätze mit 'weil' (Verbendstellung)",
+    "grammar_rules": [
+      {
+        "rule_name": "Weil-Sätze",
+        "explanation": "'weil' ist eine subordinierende Konjunktion. Das konjugierte Verb steht am Satzende. Nicht verwechseln mit 'denn' (koordinierend, Verb bleibt in Position 2).",
+        "pattern": "Hauptsatz, weil + Subjekt + ... + Verb(End).",
+        "examples": [
+          "Ich bleibe zu Hause, weil ich krank bin.",
+          "Sie lernt viel, weil sie eine Prüfung hat."
+        ]
+      }
+    ],
+    "stresses": ["reorder_word_bag", "connector_confusion"],
+    "note": "Tests that REORDER items don't allow a swap from 'weil' → 'denn' with different word order, since the grading judge is explicitly instructed to reject connector substitutions. correct_answer must be uniquely solvable from the shuffled bag."
+  },
+  {
+    "id": "gen_007_dativ_praeposition",
+    "topic": "Präpositionen mit Dativ (mit, nach, aus, bei, von, zu, seit)",
+    "grammar_rules": [
+      {
+        "rule_name": "Dativpräpositionen",
+        "explanation": "Diese Präpositionen verlangen immer den Dativ: mit, nach, aus, bei, von, zu, seit. Artikel und Possessivpronomen stehen im Dativ.",
+        "pattern": "Präposition + Dativform",
+        "examples": [
+          "mit dem Zug",
+          "bei meiner Mutter",
+          "seit einem Jahr"
+        ]
+      }
+    ],
+    "stresses": ["blank_marker_present", "correct_answer_in_options"],
+    "note": "FILL_IN_THE_BLANK/MULTIPLE_CHOICE around prepositional phrases. Generator must keep question blank-markers ('___') present and MC correct_answer must appear verbatim in the options list."
+  },
+  {
+    "id": "gen_008_wechselpraeposition",
+    "topic": "Wechselpräpositionen (Akkusativ oder Dativ)",
+    "grammar_rules": [
+      {
+        "rule_name": "Wechselpräpositionen",
+        "explanation": "An, auf, hinter, in, neben, über, unter, vor, zwischen: mit Akkusativ bei Bewegung (wohin?), mit Dativ bei Position (wo?).",
+        "pattern": "Präposition + Akk (wohin) / Dat (wo)",
+        "examples": [
+          "Ich gehe in die Schule. (wohin → Akk)",
+          "Ich bin in der Schule. (wo → Dat)"
+        ]
+      }
+    ],
+    "stresses": ["negative_mc_framing", "distractor_quality"],
+    "note": "Classic trap topic: generator is highly tempted to produce 'Welche Form ist falsch?' MCs. This case specifically validates that the prompt revision bans negative framing."
+  },
+  {
+    "id": "gen_009_komparativ_superlativ",
+    "topic": "Komparativ und Superlativ von Adjektiven",
+    "grammar_rules": [
+      {
+        "rule_name": "Steigerung",
+        "explanation": "Komparativ: Adjektiv + -er. Superlativ: am + Adjektiv + -sten (prädikativ) / der/die/das + Adjektiv + -ste (attributiv). Einige Adjektive bekommen Umlaut (alt → älter, jung → jünger).",
+        "pattern": "klein → kleiner → am kleinsten",
+        "examples": [
+          "Er ist größer als sein Bruder.",
+          "Das ist das schnellste Auto.",
+          "Meine Schwester ist am jüngsten."
+        ]
+      }
+    ],
+    "stresses": ["ambiguous_correct_answer", "correct_answer_plain_form"],
+    "note": "Risk: generator stores correct_answer as 'am schnellsten' when the blank could also take 'das schnellste' depending on sentence frame. Probes whether the sentence frame in question disambiguates the expected form."
+  },
+  {
+    "id": "gen_010_relativsatz_nom_akk",
+    "topic": "Relativsätze im Nominativ und Akkusativ",
+    "grammar_rules": [
+      {
+        "rule_name": "Relativpronomen",
+        "explanation": "Das Relativpronomen richtet sich in Genus und Numerus nach dem Bezugswort, im Kasus nach seiner Funktion im Relativsatz. Nom: der/die/das/die. Akk: den/die/das/die. Verb am Satzende.",
+        "pattern": "..., der/die/das/den/... + ... + Verb.",
+        "examples": [
+          "Der Mann, der dort steht, ist mein Vater.",
+          "Die Frau, die ich gestern traf, ist Ärztin.",
+          "Das Buch, das ich lese, ist spannend."
+        ]
+      }
+    ],
+    "stresses": ["reorder_word_bag", "connector_confusion", "blank_marker_present"],
+    "note": "Relative pronouns are visually similar to definite articles — high risk that REORDER question shuffles words in a way that allows multiple valid sentences, or that COMPLETION correct_answer ('der' vs 'den') is exact-match dependent. Regression-tests the exact-match short-circuit from 2026-04-21."
+  }
+]

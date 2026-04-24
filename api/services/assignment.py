@@ -1,9 +1,12 @@
+import random
+import re
+
 import structlog
 
 from config import settings
 from db import async_session
 from models.assignment import Assignment as AssignmentRow
-from models.assignment_schema import AssignmentContent
+from models.assignment_schema import AssignmentContent, AssignmentItem, SectionType
 from models.extraction import PageExtraction
 from models.grammar_rule import GrammarRule as GrammarRuleRow
 from models.learner_profile import LearnerProfile
@@ -27,8 +30,12 @@ Anforderungen:
 
 Übungstypen:
 - REORDER: Wörter in die richtige Reihenfolge bringen. \
-question = durcheinander geworfene Wörter (mit " / " getrennt). \
-correct_answer = der korrekte Satz.
+question = ALLE Wörter des Satzes in zufälliger Reihenfolge, mit " / " getrennt. \
+Satzzeichen (Punkt, Komma) NICHT als Shuffle-Token aufnehmen — \
+Satzzeichen gehören nur in correct_answer. \
+Jedes Wort aus correct_answer muss in question stehen (auch doppelte wie "ich", "der", "die"), \
+und kein Wort darf in question stehen, das nicht in correct_answer vorkommt. \
+correct_answer = der korrekte Satz mit korrekter Groß-/Kleinschreibung und Satzzeichen.
 - COMPLETION: Lücke mit der richtigen grammatischen Form füllen \
 (Deklination, Konjugation, Kasus). \
 question = Satz mit ___ für die Lücke + Grundform in Klammern. \
@@ -39,9 +46,48 @@ correct_answer = Adjektiv mit korrekter Endung.
 - FILL_IN_THE_BLANK: Fehlendes Wort aus dem Kontext erschließen. \
 question = Satz mit ___. correct_answer = das fehlende Wort.
 - MULTIPLE_CHOICE: Richtige Option wählen. \
-question = Frage oder Lückensatz. options = 3–4 Optionen. \
-correct_answer = die korrekte Option (muss in options enthalten sein).
+question = Frage oder Lückensatz, die nach der KORREKTEN Antwort fragt. \
+Frage NIE nach der falschen/nicht-korrekten Option \
+(keine Formulierungen wie "Welche ist NICHT korrekt?", \
+"Welche ist falsch?", "Welche ist inkorrekt?"). \
+options = 3–4 Optionen, alle plausibel, aber nur eine korrekt. \
+correct_answer = die korrekte Option, BYTEGLEICH wie in options \
+(gleiche Groß-/Kleinschreibung, gleiche Satzzeichen, gleiche Leerzeichen). \
+WICHTIG: correct_answer MUSS exakt einer der options entsprechen — \
+kopiere den Text der richtigen Option direkt in correct_answer.
 """
+
+
+def _derive_reorder_question(correct_answer: str) -> str:
+    """Build a scrambled word list from the answer, guaranteed to bag-match the eval check.
+
+    Derives question tokens from correct_answer rather than trusting the LLM to copy them —
+    making the REORDER bag invariant hold by construction (the eval check becomes tautological
+    for this invariant, but still catches empty fields and other structural issues).
+    """
+    words = [re.sub(r"[^\w]", "", w) for w in correct_answer.split()]
+    words = [w for w in words if w]
+    random.shuffle(words)
+    return " / ".join(words)
+
+
+def _fix_mc_item(item: AssignmentItem) -> None:
+    """Ensure correct_answer appears byte-exact in options, replacing the last distractor if not."""
+    if not item.options or item.correct_answer in item.options:
+        return
+    if len(item.options) >= 4:
+        item.options[-1] = item.correct_answer
+    else:
+        item.options.append(item.correct_answer)
+
+
+def _sanitize_assignment(content: AssignmentContent) -> None:
+    for section in content.sections:
+        for item in section.items:
+            if section.type == SectionType.REORDER:
+                item.question = _derive_reorder_question(item.correct_answer)
+            elif section.type == SectionType.MULTIPLE_CHOICE:
+                _fix_mc_item(item)
 
 
 def _format_rules_context(extractions: list[PageExtraction]) -> str:
@@ -113,6 +159,8 @@ async def generate_assignment(
         )
     ).parsed
 
+    _sanitize_assignment(result)
+
     log.info(
         "assignment_generated",
         topic=resolved_topic,
@@ -167,6 +215,8 @@ async def generate_assignment_from_rules(
             trace_name="assignment_generation_from_rules",
         )
     ).parsed
+
+    _sanitize_assignment(result)
 
     log.info(
         "assignment_generated_from_rules",

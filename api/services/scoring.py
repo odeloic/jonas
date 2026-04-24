@@ -43,7 +43,9 @@ async def score_submission(
         for item, user_answer in zip(section.items, section_answers.items, strict=True):
             total_max += 1
 
-            if section.type in SEMANTIC_TYPES:
+            if normalize(user_answer) == normalize(item.correct_answer):
+                is_correct = True
+            elif section.type in SEMANTIC_TYPES:
                 result = await judge_answer(
                     student_answer=user_answer,
                     correct_answer=item.correct_answer,
@@ -54,7 +56,7 @@ async def score_submission(
                 if first_trace_id is None and result.raw_result.trace_id:
                     first_trace_id = result.raw_result.trace_id
             else:
-                is_correct = normalize(user_answer) == normalize(item.correct_answer)
+                is_correct = False
 
             if is_correct:
                 total_score += 1

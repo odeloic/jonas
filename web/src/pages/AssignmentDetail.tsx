@@ -26,12 +26,8 @@ export default function AssignmentDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const allFilled =
-    answers.length > 0 &&
-    answers.every((section) => section.every((a) => a.trim() !== ""));
-
   async function handleSubmit() {
-    if (!id || !allFilled) return;
+    if (!id || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -84,7 +80,7 @@ export default function AssignmentDetail() {
 
       <button
         onClick={handleSubmit}
-        disabled={!allFilled || submitting}
+        disabled={submitting}
         className="w-full bg-gray-900 text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-40"
       >
         {submitting ? "Wird gesendet…" : "Abgeben"}

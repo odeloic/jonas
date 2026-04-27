@@ -30,7 +30,10 @@ auf dem Niveau {cefr_level}.
 Anforderungen:
 - Alltagstaugliche, nützliche Wörter
 - Verschiedene Wortklassen (Nomen, Verben, Adjektive)
-- Bei Nomen: Artikel und Pluralform angeben
+- Bei Nomen: 'word' enthält nur das Lemma im Nominativ Singular ohne Artikel
+  (z. B. 'Puppe', nicht 'die Puppe' und nicht 'Puppen').
+  Den Artikel separat in 'article' ('der'/'die'/'das'),
+  die Pluralform separat in 'plural' (ohne Artikel, z. B. 'Puppen').
 - Kurze Definition auf Deutsch und Englisch
 - Ein Beispielsatz pro Wort
 """

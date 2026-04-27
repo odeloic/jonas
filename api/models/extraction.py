@@ -1,11 +1,34 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class VocabularyItem(BaseModel):
-    word: str
-    article: str | None = None
-    plural: str | None = None
-    word_class: str
+    word: str = Field(
+        description=(
+            "The bare lemma, never including the article. "
+            "For nouns, the singular nominative form only "
+            "(e.g. 'Puppe', not 'die Puppe' and not 'Puppen')."
+        )
+    )
+    article: str | None = Field(
+        default=None,
+        description=(
+            "For nouns only: 'der', 'die', or 'das' (singular nominative). Null for non-nouns."
+        ),
+    )
+    plural: str | None = Field(
+        default=None,
+        description=(
+            "For nouns only: the plural form without article "
+            "(e.g. 'Puppen'). Null for non-nouns or when no plural exists."
+        ),
+    )
+    word_class: str = Field(
+        description=(
+            "One of: Nomen, Verb, Adjektiv, Adverb, Präposition, "
+            "Konjunktion, Pronomen, Artikel, Numerale, Interjektion. "
+            "Always in German, never in English."
+        )
+    )
     definition_de: str | None = None
     definition_en: str | None = None
     example_sentence: str | None = None

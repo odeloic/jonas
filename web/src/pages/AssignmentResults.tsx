@@ -5,7 +5,7 @@ import type {
   AssignmentDetail,
   SubmissionResult,
 } from "../api/types";
-import ResultSection from "../components/ResultSection";
+import ResultSectionView from "../components/ResultSection";
 
 export default function AssignmentResults() {
   const { id, submissionId } = useParams<{
@@ -64,7 +64,7 @@ export default function AssignmentResults() {
       </div>
 
       {result.feedback.sections.map((sectionFeedback, i) => (
-        <ResultSection
+        <ResultSectionView
           key={i}
           section={assignment.content.sections[i]}
           feedback={sectionFeedback}

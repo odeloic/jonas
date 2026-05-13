@@ -48,20 +48,43 @@ export type SectionType =
   | "FILL_IN_THE_BLANK"
   | "MULTIPLE_CHOICE";
 
-export interface AssignmentItem {
-  question: string;
-  options: string[] | null;
+export interface ReorderExerciseItem {
+  type: "REORDER";
+  tokens: string[];
 }
 
-export interface AssignmentSection {
+export interface MultipleChoiceExerciseItem {
+  type: "MULTIPLE_CHOICE";
+  question: string;
+  options: string[];
+}
+
+export interface AdjektivDeklinationExerciseItem {
+  type: "ADJEKTIV_DEKLINATION";
+  question: string;
+  candidate_endings: string[];
+}
+
+export interface CriterionExerciseItem {
+  type: "COMPLETION" | "FILL_IN_THE_BLANK";
+  question: string;
+}
+
+export type ExerciseItem =
+  | ReorderExerciseItem
+  | MultipleChoiceExerciseItem
+  | AdjektivDeklinationExerciseItem
+  | CriterionExerciseItem;
+
+export interface ExerciseSection {
   type: SectionType;
   title: string;
   instructions: string;
-  items: AssignmentItem[];
+  items: ExerciseItem[];
 }
 
-export interface AssignmentContent {
-  sections: AssignmentSection[];
+export interface ExerciseContent {
+  sections: ExerciseSection[];
 }
 
 export interface AssignmentSummary {
@@ -77,7 +100,7 @@ export interface AssignmentDetail {
   id: number;
   type: string;
   topic: string;
-  content: AssignmentContent;
+  content: ExerciseContent;
   source: string;
   created_at: string;
 }
@@ -113,7 +136,7 @@ export interface FlashcardSetDetail {
 // --- Submission types ---
 
 export interface SectionAnswers {
-  items: string[];
+  items: string[][];
 }
 
 export interface SubmissionAnswers {
@@ -122,8 +145,10 @@ export interface SubmissionAnswers {
 
 export interface ItemFeedback {
   correct: boolean;
-  user_answer: string;
-  correct_answer: string;
+  user_answer: string[];
+  correct_answer: string | null;
+  example_answer: string | null;
+  grading_criterion: string | null;
   hint: string | null;
 }
 

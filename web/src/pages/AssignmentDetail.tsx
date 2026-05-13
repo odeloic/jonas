@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { fetchAssignment, submitAssignment } from "../api/assignments";
 import type { AssignmentDetail as AssignmentDetailType } from "../api/types";
-import ExerciseSection from "../components/ExerciseSection";
+import ExerciseSectionView from "../components/ExerciseSection";
 
 export default function AssignmentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -10,7 +10,7 @@ export default function AssignmentDetail() {
   const [assignment, setAssignment] = useState<AssignmentDetailType | null>(
     null,
   );
-  const [answers, setAnswers] = useState<string[][]>([]);
+  const [answers, setAnswers] = useState<string[][][]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export default function AssignmentDetail() {
     fetchAssignment(Number(id))
       .then((data) => {
         setAssignment(data);
-        setAnswers(data.content.sections.map((s) => s.items.map(() => "")));
+        setAnswers(data.content.sections.map((s) => s.items.map(() => [])));
       })
       .catch(() => setError("Aufgabe konnte nicht geladen werden."))
       .finally(() => setLoading(false));
@@ -61,13 +61,13 @@ export default function AssignmentDetail() {
       </div>
 
       {assignment.content.sections.map((section, i) => (
-        <ExerciseSection
+        <ExerciseSectionView
           key={i}
           section={section}
           answers={answers[i] ?? []}
           onAnswerChange={(itemIndex, value) => {
             setAnswers((prev) => {
-              const next = prev.map((s) => [...s]);
+              const next = prev.map((s) => s.map((row) => [...row]));
               next[i][itemIndex] = value;
               return next;
             });

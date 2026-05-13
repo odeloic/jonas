@@ -1,16 +1,23 @@
 import asyncio
+import random
 from datetime import datetime
+from typing import Annotated, Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from config import settings
 from db import async_session
 from models.assignment import Assignment
 from models.assignment_schema import (
+    AdjektivDeklinationItem,
     AssignmentContent,
+    CriterionItem,
+    MultipleChoiceItem,
+    ReorderItem,
+    SectionType,
     SubmissionAnswers,
     SubmissionFeedback,
     SubmissionResult,
@@ -37,13 +44,39 @@ class AssignmentSummary(BaseModel):
     created_at: datetime
 
 
-class ExerciseItem(BaseModel):
+class ReorderExerciseItem(BaseModel):
+    type: Literal[SectionType.REORDER]
+    tokens: list[str]  # shuffled for client display
+
+
+class MultipleChoiceExerciseItem(BaseModel):
+    type: Literal[SectionType.MULTIPLE_CHOICE]
     question: str
-    options: list[str] | None = None
+    options: list[str]
+
+
+class AdjektivDeklinationExerciseItem(BaseModel):
+    type: Literal[SectionType.ADJEKTIV_DEKLINATION]
+    question: str
+    candidate_endings: list[str]
+
+
+class CriterionExerciseItem(BaseModel):
+    type: Literal[SectionType.COMPLETION, SectionType.FILL_IN_THE_BLANK]
+    question: str
+
+
+ExerciseItem = Annotated[
+    ReorderExerciseItem
+    | MultipleChoiceExerciseItem
+    | AdjektivDeklinationExerciseItem
+    | CriterionExerciseItem,
+    Field(discriminator="type"),
+]
 
 
 class ExerciseSection(BaseModel):
-    type: str
+    type: SectionType
     title: str
     instructions: str
     items: list[ExerciseItem]
@@ -67,6 +100,25 @@ class SubmitRequest(BaseModel):
 
 
 # --- Helpers ---
+
+
+def _project_item_for_exercise(item) -> ExerciseItem:
+    """Hide answer-bearing fields; expose only what the UI needs to render."""
+    if isinstance(item, ReorderItem):
+        shuffled = list(item.correct_tokens)
+        random.shuffle(shuffled)
+        return ReorderExerciseItem(type=item.type, tokens=shuffled)
+    if isinstance(item, MultipleChoiceItem):
+        return MultipleChoiceExerciseItem(
+            type=item.type, question=item.question, options=item.options
+        )
+    if isinstance(item, AdjektivDeklinationItem):
+        return AdjektivDeklinationExerciseItem(
+            type=item.type, question=item.question, candidate_endings=item.candidate_endings
+        )
+    if isinstance(item, CriterionItem):
+        return CriterionExerciseItem(type=item.type, question=item.question)
+    raise TypeError(f"Unknown item type: {type(item).__name__}")
 
 
 async def _send_and_store_tg_result(
@@ -110,9 +162,7 @@ async def get_assignment(assignment_id: int):
                 type=s.type,
                 title=s.title,
                 instructions=s.instructions,
-                items=[
-                    ExerciseItem(question=item.question, options=item.options) for item in s.items
-                ],
+                items=[_project_item_for_exercise(item) for item in s.items],
             )
             for s in full_content.sections
         ]

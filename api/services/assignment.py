@@ -1,12 +1,15 @@
-import random
-import re
-
 import structlog
 
 from config import settings
 from db import async_session
 from models.assignment import Assignment as AssignmentRow
-from models.assignment_schema import AssignmentContent, AssignmentItem, SectionType
+from models.assignment_schema import (
+    AdjektivDeklinationItem,
+    AssignmentContent,
+    CriterionItem,
+    MultipleChoiceItem,
+    ReorderItem,
+)
 from models.extraction import PageExtraction
 from models.grammar_rule import GrammarRule as GrammarRuleRow
 from models.learner_profile import LearnerProfile
@@ -24,56 +27,65 @@ die das Verständnis dieser Regeln testet.
 Anforderungen:
 - Mindestens 2 Abschnitte mit VERSCHIEDENEN Übungstypen
 - 3–5 Aufgaben pro Abschnitt
-- Jede Aufgabe hat GENAU EINE korrekte Antwort in correct_answer
 - Alle Texte auf Deutsch
 - instructions pro Abschnitt erklärt dem Lerner, was zu tun ist
+- Items eines Abschnitts haben den gleichen type-Wert wie der Abschnitt
 
-Übungstypen:
-- REORDER: Wörter in die richtige Reihenfolge bringen. \
-question = ALLE Wörter des Satzes in zufälliger Reihenfolge, mit " / " getrennt. \
-Satzzeichen (Punkt, Komma) NICHT als Shuffle-Token aufnehmen — \
-Satzzeichen gehören nur in correct_answer. \
-Jedes Wort aus correct_answer muss in question stehen (auch doppelte wie "ich", "der", "die"), \
-und kein Wort darf in question stehen, das nicht in correct_answer vorkommt. \
-correct_answer = der korrekte Satz mit korrekter Groß-/Kleinschreibung und Satzzeichen.
-- COMPLETION: Lücke mit der richtigen grammatischen Form füllen \
-(Deklination, Konjugation, Kasus). \
-question = Satz mit ___ für die Lücke + Grundform in Klammern. \
-correct_answer = die korrekt flektierte Form.
-- ADJEKTIV_DEKLINATION: Adjektivendung ergänzen. \
-question = Satz mit Adjektiv ohne Endung + ___. \
-correct_answer = Adjektiv mit korrekter Endung.
-- FILL_IN_THE_BLANK: Fehlendes Wort aus dem Kontext erschließen. \
-question = Satz mit ___. correct_answer = das fehlende Wort.
-- MULTIPLE_CHOICE: Richtige Option wählen. \
-question = Frage oder Lückensatz, die nach der KORREKTEN Antwort fragt. \
-Frage NIE nach der falschen/nicht-korrekten Option \
-(keine Formulierungen wie "Welche ist NICHT korrekt?", \
-"Welche ist falsch?", "Welche ist inkorrekt?"). \
-options = 3–4 Optionen, alle plausibel, aber nur eine korrekt. \
-correct_answer = die korrekte Option, BYTEGLEICH wie in options \
-(gleiche Groß-/Kleinschreibung, gleiche Satzzeichen, gleiche Leerzeichen). \
-WICHTIG: correct_answer MUSS exakt einer der options entsprechen — \
-kopiere den Text der richtigen Option direkt in correct_answer.
+Übungstypen — verwende EXAKT die unten genannten Felder, keine alten Felder:
+
+- REORDER (geschlossen, deterministisch geprüft):
+  - correct_tokens = Liste der Wörter des korrekten Satzes in korrekter Reihenfolge, \
+ohne Satzzeichen (Punkt/Komma weglassen). \
+Groß-/Kleinschreibung wie im fertigen Satz.
+  - Die korrekte Reihenfolge ist bindend — keine alternativen Vorfeld-Stellungen.
+  - Beispiel: correct_tokens=["Ich","gehe","heute","ins","Kino"].
+
+- MULTIPLE_CHOICE (geschlossen, deterministisch geprüft):
+  - question = Frage oder Lückensatz, der nach der KORREKTEN Antwort fragt. \
+NIE nach der falschen Option fragen (keine Formulierungen wie \
+"Welche ist NICHT korrekt?", "Welche ist falsch?", "Welche ist inkorrekt?").
+  - options = 3–4 plausible Optionen, nur eine korrekt.
+  - correct_answer = die korrekte Option, BYTEGLEICH wie in options.
+
+- ADJEKTIV_DEKLINATION (geschlossen, deterministisch geprüft):
+  - question = Satz mit der Adjektiv-Lücke markiert durch ___ \
+(z. B. "Der nett___ Mann lacht.").
+  - correct_ending = die korrekte Endung als Suffix mit führendem Bindestrich \
+(z. B. "-e", "-er", "-en", "-es", "-em").
+  - candidate_endings = 3–5 plausible Endungen (Liste), die genau correct_ending enthält. \
+Die UI rendert daraus einen Endungs-Wähler — KEIN Freitext-Input.
+
+- COMPLETION (kriteriumbasiert, Judge-Bewertung):
+  - question = Satz mit einer oder mehreren Lücken, markiert durch ___. \
+Bei lexikalischer Vorgabe die Grundform in Klammern hinter der Lücke \
+(z. B. "Ich helfe ___ (das Kind)."). Bei mehreren Lücken im Satz JEDE Lücke einzeln markieren.
+  - grading_criterion = freie Beschreibung der Regel, die getestet wird, \
+und was eine korrekte Antwort ausmacht. \
+WENN das Item lexikalische Freiheit zulässt (z. B. "Genitiv einer femininen Person"), \
+mach das im Kriterium explizit. \
+WENN mehrere Lücken existieren, MUSS das Kriterium beschreiben, was JEDE Lücke verlangt.
+  - example_answer = EINE mögliche Musterantwort. \
+Bei mehreren Lücken die Antworten durch " / " trennen (z. B. "dem Kind / der Hausaufgabe"). \
+Die example_answer wird dem Lerner bei falscher Antwort gezeigt — sie ist Beispiel, KEIN Anker.
+
+- FILL_IN_THE_BLANK (kriteriumbasiert, Judge-Bewertung):
+  - Gleiche Felder und Regeln wie COMPLETION. \
+Verwende diesen Typ, wenn das fehlende Wort aus dem Kontext erschlossen werden muss \
+(Vokabel / Konnektor) und keine reine Flexion getestet wird.
+
+Wichtige Hinweise gegen typische Fehler:
+- Verwende NIEMALS ein Feld "correct_answer" für REORDER, COMPLETION, FILL_IN_THE_BLANK \
+oder ADJEKTIV_DEKLINATION. correct_answer existiert nur bei MULTIPLE_CHOICE.
+- Wenn dieselbe Lücke morphologisch durch mehrere Worte ausgefüllt werden kann \
+(z. B. Genitiv "meiner Schwester" vs. "meiner Mutter"), nutze einen kriteriumbasierten Typ \
+(COMPLETION oder FILL_IN_THE_BLANK), nicht REORDER/MC.
+- Bei ADJEKTIV_DEKLINATION nie die volle Form als correct_ending — nur das Suffix.
 """
 
 
-def _derive_reorder_question(correct_answer: str) -> str:
-    """Build a scrambled word list from the answer, guaranteed to bag-match the eval check.
-
-    Derives question tokens from correct_answer rather than trusting the LLM to copy them —
-    making the REORDER bag invariant hold by construction (the eval check becomes tautological
-    for this invariant, but still catches empty fields and other structural issues).
-    """
-    words = [re.sub(r"[^\w]", "", w) for w in correct_answer.split()]
-    words = [w for w in words if w]
-    random.shuffle(words)
-    return " / ".join(words)
-
-
-def _fix_mc_item(item: AssignmentItem) -> None:
-    """Ensure correct_answer appears byte-exact in options, replacing the last distractor if not."""
-    if not item.options or item.correct_answer in item.options:
+def _fix_mc_item(item: MultipleChoiceItem) -> None:
+    """Ensure correct_answer appears byte-exact in options."""
+    if item.correct_answer in item.options:
         return
     if len(item.options) >= 4:
         item.options[-1] = item.correct_answer
@@ -82,12 +94,31 @@ def _fix_mc_item(item: AssignmentItem) -> None:
 
 
 def _sanitize_assignment(content: AssignmentContent) -> None:
+    """Apply per-type structural fixes after generation.
+
+    REORDER: strip empty tokens, ensure non-empty list.
+    MULTIPLE_CHOICE: ensure correct_answer is byte-exact in options.
+    ADJEKTIV_DEKLINATION: ensure correct_ending is in candidate_endings.
+    Criterion items: validate non-empty criterion + example.
+    """
     for section in content.sections:
         for item in section.items:
-            if section.type == SectionType.REORDER:
-                item.question = _derive_reorder_question(item.correct_answer)
-            elif section.type == SectionType.MULTIPLE_CHOICE:
+            if isinstance(item, ReorderItem):
+                item.correct_tokens = [t for t in item.correct_tokens if t.strip()]
+                if not item.correct_tokens:
+                    raise ValueError("REORDER item has empty correct_tokens")
+            elif isinstance(item, MultipleChoiceItem):
                 _fix_mc_item(item)
+            elif isinstance(item, AdjektivDeklinationItem):
+                if item.correct_ending not in item.candidate_endings:
+                    item.candidate_endings.append(item.correct_ending)
+            elif isinstance(item, CriterionItem):
+                if not item.grading_criterion.strip():
+                    raise ValueError(f"{item.type} item has empty grading_criterion")
+                if not item.example_answer.strip():
+                    raise ValueError(f"{item.type} item has empty example_answer")
+                if "___" not in item.question:
+                    raise ValueError(f"{item.type} item has no ___ blank marker: {item.question!r}")
 
 
 def _format_rules_context(extractions: list[PageExtraction]) -> str:

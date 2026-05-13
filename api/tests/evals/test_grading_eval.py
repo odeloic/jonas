@@ -1,4 +1,4 @@
-"""Grading quality eval — validates semantic judge against golden dataset.
+"""Grading quality eval — validates criterion-based judge against golden dataset.
 
 Acceptance bar:
   False positive rate = 0%   (hard assert — clearly_wrong cases must never pass)
@@ -24,14 +24,14 @@ async def test_grading_eval(llm_service, langfuse_client):
     cases = json.loads(DATASET_PATH.read_text())
     assert len(cases) >= 30, f"Expected 30+ cases in golden dataset, got {len(cases)}"
 
-    # 1. Run all judge calls
     results: list[tuple[dict, JudgeResult | None]] = []
     for case in cases:
         try:
             result = await judge_answer(
-                student_answer=case["test_answer"],
-                correct_answer=case["correct_answer"],
                 question=case["question"],
+                grading_criterion=case["grading_criterion"],
+                example_answer=case["example_answer"],
+                student_answers=case["test_answer"],
                 llm=llm_service,
             )
         except Exception as exc:  # noqa: BLE001
@@ -39,19 +39,19 @@ async def test_grading_eval(llm_service, langfuse_client):
             print(f"  [JUDGE_ERROR] {case['id']}: {exc}")
         results.append((case, result))
 
-    # 2. Log to Langfuse dataset
     if langfuse_client is not None:
         dataset_name = f"grading-eval-{date.today().isoformat()}"
         try:
             langfuse_client.create_dataset(name=dataset_name)
         except Exception:  # noqa: BLE001
-            pass  # dataset may already exist for today
+            pass
         for case, result in results:
             langfuse_client.create_dataset_item(
                 dataset_name=dataset_name,
                 input={
                     "question": case["question"],
-                    "correct_answer": case["correct_answer"],
+                    "grading_criterion": case["grading_criterion"],
+                    "example_answer": case["example_answer"],
                     "test_answer": case["test_answer"],
                 },
                 expected_output={"expected_correct": case["expected_correct"]},
@@ -67,7 +67,6 @@ async def test_grading_eval(llm_service, langfuse_client):
             )
         langfuse_client.flush()
 
-    # 3. Aggregate metrics
     by_bucket: dict[str, list] = defaultdict(list)
     by_type: dict[str, list] = defaultdict(list)
     for case, result in results:
@@ -85,7 +84,6 @@ async def test_grading_eval(llm_service, langfuse_client):
     fn_cases = [(c, r) for c, r in sc_cases if r is None or not r.is_correct]
     fn_rate = len(fn_cases) / len(sc_cases) if sc_cases else 0.0
 
-    # 4. Print breakdown
     print("\n=== Grading Eval Results ===")
     print("\nBy bucket:")
     for bucket in ("exactly_correct", "semantic_correct", "clearly_wrong"):
@@ -95,14 +93,7 @@ async def test_grading_eval(llm_service, langfuse_client):
         print(f"  {bucket:<22} {ok}/{len(items)}  failures: {fails or 'none'}")
 
     print("\nBy exercise type:")
-    exercise_types = (
-        "REORDER",
-        "COMPLETION",
-        "ADJEKTIV_DEKLINATION",
-        "FILL_IN_THE_BLANK",
-        "MULTIPLE_CHOICE",
-    )
-    for etype in exercise_types:
+    for etype in ("COMPLETION", "FILL_IN_THE_BLANK"):
         items = by_type[etype]
         ok = sum(1 for c, r in items if matched(c, r))
         print(f"  {etype:<26} {ok}/{len(items)}")
@@ -112,7 +103,6 @@ async def test_grading_eval(llm_service, langfuse_client):
     if langfuse_client:
         print(f"Logged to Langfuse dataset: grading-eval-{date.today().isoformat()}")
 
-    # 5. Assertions
     assert fp_rate == 0.0, (
         f"False positive rate {fp_rate:.1%} — "
         f"clearly_wrong cases graded correct: {[c['id'] for c, _ in fp_cases]}"

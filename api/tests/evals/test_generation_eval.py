@@ -3,13 +3,12 @@
 Acceptance bar:
   0 invariant violations across all cases (hard assert)
 
-Invariants applied to every generated assignment:
-  - At least 2 sections, each non-empty
-  - Every item has a non-empty question and correct_answer
+Invariants applied per item type:
   - MULTIPLE_CHOICE: 3-4 options, correct_answer in options, no negative framing
-    (no "NICHT korrekt", "falsch", "inkorrekt" — these produce contradictory hints)
-  - COMPLETION / FILL_IN_THE_BLANK / ADJEKTIV_DEKLINATION: question contains a blank marker
-  - REORDER: word bag in question == word bag in correct_answer (case- and punctuation-normalized)
+  - REORDER: correct_tokens non-empty, no punctuation in tokens
+  - ADJEKTIV_DEKLINATION: question has ___ marker, candidate_endings contains correct_ending
+  - COMPLETION / FILL_IN_THE_BLANK: question has ≥1 ___ marker,
+    grading_criterion and example_answer non-empty
 
 Run with:
   pytest tests/evals/test_generation_eval.py -v -s
@@ -17,12 +16,17 @@ Run with:
 
 import json
 import re
-from collections import Counter
 from pathlib import Path
 
 import pytest
 
-from models.assignment_schema import AssignmentContent, SectionType
+from models.assignment_schema import (
+    AdjektivDeklinationItem,
+    AssignmentContent,
+    CriterionItem,
+    MultipleChoiceItem,
+    ReorderItem,
+)
 from models.extraction import GrammarRule, PageExtraction
 from services.assignment import generate_assignment
 
@@ -33,13 +37,7 @@ _NEGATIVE_FRAMING = re.compile(
     r"\bnicht\s+korrekt\b|\bnicht\s+richtig\b|\bfalsch\w*\b|\binkorrekt\w*\b",
     re.IGNORECASE,
 )
-_BLANK_TYPES = frozenset(
-    {
-        SectionType.COMPLETION,
-        SectionType.FILL_IN_THE_BLANK,
-        SectionType.ADJEKTIV_DEKLINATION,
-    }
-)
+_PUNCT_IN_TOKEN = re.compile(r"[.,;:!?]")
 
 
 @pytest.fixture(scope="module")
@@ -58,22 +56,6 @@ def _build_extraction(case: dict) -> PageExtraction:
     )
 
 
-def _normalize_token(token: str) -> str:
-    return re.sub(r"[^\w]", "", token, flags=re.UNICODE).lower()
-
-
-def _reorder_bag_diff(question: str, correct_answer: str) -> str | None:
-    q_tokens = [_normalize_token(t) for t in question.split("/")]
-    a_tokens = [_normalize_token(t) for t in correct_answer.split()]
-    q_bag = Counter(t for t in q_tokens if t)
-    a_bag = Counter(t for t in a_tokens if t)
-    if q_bag == a_bag:
-        return None
-    only_q = dict(q_bag - a_bag)
-    only_a = dict(a_bag - q_bag)
-    return f"q={question!r} a={correct_answer!r} question_only={only_q} answer_only={only_a}"
-
-
 def _check_invariants(content: AssignmentContent) -> list[str]:
     issues: list[str] = []
 
@@ -88,15 +70,11 @@ def _check_invariants(content: AssignmentContent) -> list[str]:
         for ii, item in enumerate(section.items):
             loc = f"s{si}i{ii}[{section.type.value}]"
 
-            if not item.question.strip():
-                issues.append(f"{loc}:empty_question")
-            if not item.correct_answer.strip():
-                issues.append(f"{loc}:empty_correct_answer")
-
-            if section.type == SectionType.MULTIPLE_CHOICE:
-                if not item.options or not (3 <= len(item.options) <= 4):
-                    count = len(item.options) if item.options else 0
-                    issues.append(f"{loc}:mc_has_{count}_options")
+            if isinstance(item, MultipleChoiceItem):
+                if not item.question.strip():
+                    issues.append(f"{loc}:empty_question")
+                if not (3 <= len(item.options) <= 4):
+                    issues.append(f"{loc}:mc_has_{len(item.options)}_options")
                 elif item.correct_answer not in item.options:
                     issues.append(
                         f"{loc}:mc_correct_answer_not_in_options "
@@ -105,13 +83,29 @@ def _check_invariants(content: AssignmentContent) -> list[str]:
                 if _NEGATIVE_FRAMING.search(item.question):
                     issues.append(f"{loc}:mc_negative_framing q={item.question!r}")
 
-            if section.type in _BLANK_TYPES and not _BLANK_MARKER.search(item.question):
-                issues.append(f"{loc}:missing_blank_marker q={item.question!r}")
+            elif isinstance(item, ReorderItem):
+                if not item.correct_tokens:
+                    issues.append(f"{loc}:reorder_empty_tokens")
+                bad = [t for t in item.correct_tokens if _PUNCT_IN_TOKEN.search(t)]
+                if bad:
+                    issues.append(f"{loc}:reorder_tokens_have_punctuation tokens={bad!r}")
 
-            if section.type == SectionType.REORDER:
-                diff = _reorder_bag_diff(item.question, item.correct_answer)
-                if diff:
-                    issues.append(f"{loc}:reorder_bag_mismatch {diff}")
+            elif isinstance(item, AdjektivDeklinationItem):
+                if not _BLANK_MARKER.search(item.question):
+                    issues.append(f"{loc}:adj_missing_blank q={item.question!r}")
+                if item.correct_ending not in item.candidate_endings:
+                    issues.append(
+                        f"{loc}:adj_correct_not_in_candidates "
+                        f"correct={item.correct_ending!r} candidates={item.candidate_endings!r}"
+                    )
+
+            elif isinstance(item, CriterionItem):
+                if not _BLANK_MARKER.search(item.question):
+                    issues.append(f"{loc}:criterion_missing_blank q={item.question!r}")
+                if not item.grading_criterion.strip():
+                    issues.append(f"{loc}:criterion_empty_grading_criterion")
+                if not item.example_answer.strip():
+                    issues.append(f"{loc}:criterion_empty_example_answer")
 
     return issues
 

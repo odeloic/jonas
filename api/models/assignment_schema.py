@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 
 class SectionType(StrEnum):
@@ -14,11 +15,47 @@ class SectionType(StrEnum):
     MULTIPLE_CHOICE = "MULTIPLE_CHOICE"
 
 
-class AssignmentItem(BaseModel):
-    question: str
-    correct_answer: str
-    options: list[str] | None = None
+class ReorderItem(BaseModel):
+    type: Literal[SectionType.REORDER]
+    correct_tokens: list[str]
     hint: str | None = None
+
+
+class MultipleChoiceItem(BaseModel):
+    type: Literal[SectionType.MULTIPLE_CHOICE]
+    question: str
+    options: list[str]
+    correct_answer: str
+    hint: str | None = None
+
+
+class AdjektivDeklinationItem(BaseModel):
+    type: Literal[SectionType.ADJEKTIV_DEKLINATION]
+    question: str
+    correct_ending: str
+    candidate_endings: list[str]
+    hint: str | None = None
+
+
+class CriterionItem(BaseModel):
+    """Used for COMPLETION and FILL_IN_THE_BLANK.
+
+    The judge grades a student's submission against `grading_criterion`. The
+    `example_answer` is shown back to the student on a wrong verdict but is not
+    consulted by the judge for grading.
+    """
+
+    type: Literal[SectionType.COMPLETION, SectionType.FILL_IN_THE_BLANK]
+    question: str
+    grading_criterion: str
+    example_answer: str
+    hint: str | None = None
+
+
+AssignmentItem = Annotated[
+    ReorderItem | MultipleChoiceItem | AdjektivDeklinationItem | CriterionItem,
+    Field(discriminator="type"),
+]
 
 
 class AssignmentSection(BaseModel):
@@ -27,10 +64,17 @@ class AssignmentSection(BaseModel):
     instructions: str
     items: list[AssignmentItem]
 
+    @model_validator(mode="after")
+    def _items_match_section_type(self) -> AssignmentSection:
+        for i, item in enumerate(self.items):
+            if item.type != self.type:
+                raise ValueError(
+                    f"items[{i}].type={item.type!r} does not match section.type={self.type!r}"
+                )
+        return self
+
 
 class AssignmentContent(BaseModel):
-    """Full assignment structure"""
-
     sections: list[AssignmentSection]
 
 
@@ -38,7 +82,7 @@ class AssignmentContent(BaseModel):
 
 
 class SectionAnswers(BaseModel):
-    items: list[str]
+    items: list[list[str]]
 
 
 class SubmissionAnswers(BaseModel):
@@ -47,8 +91,10 @@ class SubmissionAnswers(BaseModel):
 
 class ItemFeedback(BaseModel):
     correct: bool
-    user_answer: str
-    correct_answer: str
+    user_answer: list[str]
+    correct_answer: str | None = None
+    example_answer: str | None = None
+    grading_criterion: str | None = None
     hint: str | None = None
 
 

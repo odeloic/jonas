@@ -1,59 +1,42 @@
-import type { AssignmentItem, SectionType } from "../api/types";
+import type { ExerciseItem } from "../api/types";
+import AdjektivDeklinationInput from "./AdjektivDeklinationInput";
+import CriterionInput from "./CriterionInput";
+import MultipleChoiceInput from "./MultipleChoiceInput";
+import ReorderInput from "./ReorderInput";
 
-interface ExerciseItemProps {
-  item: AssignmentItem;
-  sectionType: SectionType;
+interface Props {
+  item: ExerciseItem;
   index: number;
-  value: string;
-  onChange: (value: string) => void;
+  value: string[];
+  onChange: (value: string[]) => void;
   disabled: boolean;
 }
 
-export default function ExerciseItem({
+export default function ExerciseItemView({
   item,
-  sectionType,
   index,
   value,
   onChange,
   disabled,
-}: ExerciseItemProps) {
+}: Props) {
   return (
-    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-      <p className="text-gray-900">
-        <span className="text-gray-400 text-sm mr-2">{index}.</span>
-        {item.question}
-      </p>
-
-      {sectionType === "MULTIPLE_CHOICE" && item.options ? (
-        <div className="space-y-1.5">
-          {item.options.map((opt) => (
-            <label
-              key={opt}
-              className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
-            >
-              <input
-                type="radio"
-                name={`q-${index}`}
-                value={opt}
-                checked={value === opt}
-                onChange={() => onChange(opt)}
-                disabled={disabled}
-                className="accent-gray-900"
-              />
-              {opt}
-            </label>
-          ))}
-        </div>
-      ) : (
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          placeholder="Antwort eingeben…"
-          className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 disabled:bg-gray-50"
-        />
-      )}
+    <div className="border border-gray-200 rounded-lg p-4">
+      {renderInput({ item, index, value, onChange, disabled })}
     </div>
   );
+}
+
+function renderInput(props: Props) {
+  const { item } = props;
+  switch (item.type) {
+    case "MULTIPLE_CHOICE":
+      return <MultipleChoiceInput {...props} item={item} />;
+    case "REORDER":
+      return <ReorderInput {...props} item={item} />;
+    case "ADJEKTIV_DEKLINATION":
+      return <AdjektivDeklinationInput {...props} item={item} />;
+    case "COMPLETION":
+    case "FILL_IN_THE_BLANK":
+      return <CriterionInput {...props} item={item} />;
+  }
 }

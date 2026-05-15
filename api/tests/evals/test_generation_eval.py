@@ -3,12 +3,12 @@
 Acceptance bar:
   0 invariant violations across all cases (hard assert)
 
-Invariants applied per item type:
-  - MULTIPLE_CHOICE: 3-4 options, correct_answer in options, no negative framing
-  - REORDER: correct_tokens non-empty, no punctuation in tokens
-  - ADJEKTIV_DEKLINATION: question has ___ marker, candidate_endings contains correct_ending
-  - COMPLETION / FILL_IN_THE_BLANK: question has ≥1 ___ marker,
-    grading_criterion and example_answer non-empty
+Invariants applied per item type (structural shape is already enforced by Pydantic;
+this layer catches semantic and prompt-quality issues the validator can't see):
+  - MULTIPLE_CHOICE: 3-4 options, no negative framing in question
+  - REORDER: tokens non-empty, no punctuation in any token text
+  - COMPLETION / FILL_IN_THE_BLANK: question does NOT contain ___ markers
+    (the new shape moved blanks out of the question string)
 
 Run with:
   pytest tests/evals/test_generation_eval.py -v -s
@@ -21,7 +21,6 @@ from pathlib import Path
 import pytest
 
 from models.assignment_schema import (
-    AdjektivDeklinationItem,
     AssignmentContent,
     CriterionItem,
     MultipleChoiceItem,
@@ -75,37 +74,24 @@ def _check_invariants(content: AssignmentContent) -> list[str]:
                     issues.append(f"{loc}:empty_question")
                 if not (3 <= len(item.options) <= 4):
                     issues.append(f"{loc}:mc_has_{len(item.options)}_options")
-                elif item.correct_answer not in item.options:
-                    issues.append(
-                        f"{loc}:mc_correct_answer_not_in_options "
-                        f"correct_answer={item.correct_answer!r} options={item.options!r}"
-                    )
                 if _NEGATIVE_FRAMING.search(item.question):
                     issues.append(f"{loc}:mc_negative_framing q={item.question!r}")
 
             elif isinstance(item, ReorderItem):
-                if not item.correct_tokens:
+                if not item.tokens:
                     issues.append(f"{loc}:reorder_empty_tokens")
-                bad = [t for t in item.correct_tokens if _PUNCT_IN_TOKEN.search(t)]
+                bad = [t.text for t in item.tokens if _PUNCT_IN_TOKEN.search(t.text)]
                 if bad:
                     issues.append(f"{loc}:reorder_tokens_have_punctuation tokens={bad!r}")
 
-            elif isinstance(item, AdjektivDeklinationItem):
-                if not _BLANK_MARKER.search(item.question):
-                    issues.append(f"{loc}:adj_missing_blank q={item.question!r}")
-                if item.correct_ending not in item.candidate_endings:
-                    issues.append(
-                        f"{loc}:adj_correct_not_in_candidates "
-                        f"correct={item.correct_ending!r} candidates={item.candidate_endings!r}"
-                    )
-
             elif isinstance(item, CriterionItem):
-                if not _BLANK_MARKER.search(item.question):
-                    issues.append(f"{loc}:criterion_missing_blank q={item.question!r}")
-                if not item.grading_criterion.strip():
-                    issues.append(f"{loc}:criterion_empty_grading_criterion")
-                if not item.example_answer.strip():
-                    issues.append(f"{loc}:criterion_empty_example_answer")
+                # The new shape forbids ___ in the question — blanks are structural.
+                if _BLANK_MARKER.search(item.question):
+                    issues.append(
+                        f"{loc}:criterion_has_blank_marker_in_question q={item.question!r}"
+                    )
+                if not item.blanks:
+                    issues.append(f"{loc}:criterion_empty_blanks")
 
     return issues
 

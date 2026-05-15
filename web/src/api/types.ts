@@ -44,36 +44,42 @@ export interface Stats {
 export type SectionType =
   | "REORDER"
   | "COMPLETION"
-  | "ADJEKTIV_DEKLINATION"
   | "FILL_IN_THE_BLANK"
   | "MULTIPLE_CHOICE";
 
+export interface OptionView {
+  index: number;
+  text: string;
+  // is_correct is intentionally NOT exposed — server omits it from the public payload.
+}
+
+export interface BlankView {
+  index: number;
+  // grading_criterion / example_answer / is_sentence_initial are server-side only;
+  // the client just needs the count and indices to render labeled inputs.
+}
+
 export interface ReorderExerciseItem {
   type: "REORDER";
+  // Shuffled bag of token texts. The correct order lives server-side.
   tokens: string[];
 }
 
 export interface MultipleChoiceExerciseItem {
   type: "MULTIPLE_CHOICE";
   question: string;
-  options: string[];
-}
-
-export interface AdjektivDeklinationExerciseItem {
-  type: "ADJEKTIV_DEKLINATION";
-  question: string;
-  candidate_endings: string[];
+  options: OptionView[];
 }
 
 export interface CriterionExerciseItem {
   type: "COMPLETION" | "FILL_IN_THE_BLANK";
   question: string;
+  blanks: BlankView[];
 }
 
 export type ExerciseItem =
   | ReorderExerciseItem
   | MultipleChoiceExerciseItem
-  | AdjektivDeklinationExerciseItem
   | CriterionExerciseItem;
 
 export interface ExerciseSection {
@@ -143,6 +149,14 @@ export interface SubmissionAnswers {
   sections: SectionAnswers[];
 }
 
+export interface BlankFeedback {
+  index: number;
+  correct: boolean;
+  rationale: string;
+  example_answer: string | null;
+  grading_criterion: string | null;
+}
+
 export interface ItemFeedback {
   correct: boolean;
   user_answer: string[];
@@ -150,6 +164,7 @@ export interface ItemFeedback {
   example_answer: string | null;
   grading_criterion: string | null;
   hint: string | null;
+  blank_feedbacks: BlankFeedback[] | null;
 }
 
 export interface SectionFeedback {

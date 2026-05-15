@@ -12,20 +12,23 @@ FastAPI + Postgres + Redis + Qdrant, running via Docker Compose. The `api/` dire
 
 ## Local dev commands
 
+The repo-root `Makefile` orchestrates the stack. `make help` lists targets.
+
 ```bash
-# Start full stack
-docker compose up -d
-
-# Tail API logs
-docker compose logs -f api
-
-# Stop (data persists in named volumes)
-docker compose down
+make up       # start containers, run migrations, print diagnostics
+make down     # stop containers (named volumes persist)
+make migrate  # alembic upgrade head
+make logs     # tail all logs (SERVICE=api to scope)
+make web      # vite dev server in web/
+make diag     # compose ps + health probes (api, qdrant, langfuse, postgres, redis)
 ```
+
+Raw `docker compose` commands still work and are referenced throughout this file for one-off operations (e.g. `docker compose exec api ...`).
 
 Health check URLs:
 - API: http://localhost:8000/health
 - Qdrant: http://localhost:6333/dashboard
+- Langfuse: http://localhost:3000
 
 ## Database migrations (Alembic)
 
@@ -130,8 +133,10 @@ api/
 ├── models/
 │   └── message.py    # Pydantic request/response models
 └── services/
-    └── llm.py        # LiteLLM async wrapper (provider-agnostic)
+    └── llm_service.py # Provider-routed LLM client (Anthropic + OpenAI SDKs, no LiteLLM)
 ```
+
+(Other `services/` modules — `assignment`, `correction`, `flashcard`, `grading_judge`, `intent`, etc. — are domain logic built on top of `llm_service`.)
 
 `main.py` owns no logic — only imports and wires. Logic belongs in its own module.
 
@@ -139,10 +144,17 @@ All configuration is read from environment variables via `config.settings`. The 
 
 ## Key patterns
 
-### LLM service (`services/llm.py`)
-- `async def complete(messages, model=None, max_tokens=1024) -> str` — thin wrapper around `litellm.acompletion()`
-- Falls back to `settings.default_model` (currently `claude-haiku-4-5-20251001`)
-- Logs token usage via structlog; catches `AuthenticationError` and `APIError`
+### LLM service (`services/llm_service.py`)
+- Routes by model name: `claude-*` → `anthropic.AsyncAnthropic`, otherwise → `openai.AsyncOpenAI`. **No LiteLLM** — native SDKs for first-class structured-output support.
+- Returns `LLMResult[T]` (parsed payload + raw response + token usage + `trace_id`), not a bare string.
+- Falls back to `settings.default_model` (currently `claude-haiku-4-5-20251001`).
+- Clients are lazily instantiated and cached on the service instance.
+
+### Langfuse tracing
+- Enabled when `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY` are set (and `langfuse_enabled=True`, the default). Client is lazy-loaded in `LLMService._get_langfuse()`.
+- Keys are generated in the self-hosted Langfuse UI at http://localhost:3000 → project settings → API Keys (`pk-lf-…` / `sk-lf-…`).
+- `LANGFUSE_HOST` defaults to `http://langfuse:3000` (compose service name) for in-container traffic. Use `http://localhost:3000` only when running the API outside Docker (e.g., evals).
+- Image content is stripped from traces by `_sanitize_messages_for_langfuse()` — Langfuse never receives base64 blobs.
 
 ### Telegram bot (`channels/telegram.py`)
 - Built with `python-telegram-bot>=21.0` (async, v21 API)
@@ -158,7 +170,7 @@ All configuration is read from environment variables via `config.settings`. The 
 
 ### Config (`config.py`)
 - Pydantic `BaseSettings` singleton, all env vars
-- Key settings: `default_model`, `telegram_bot_token`, `telegram_allowed_chat_id`, `anthropic_api_key`
+- Key settings: `default_model`, `anthropic_api_key`, `openai_api_key`, `telegram_bot_token`, `telegram_allowed_chat_id`, `langfuse_public_key` / `langfuse_secret_key` / `langfuse_host` / `langfuse_enabled`
 
 ## Async pattern
 

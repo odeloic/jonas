@@ -3,8 +3,8 @@ import unicodedata
 import structlog
 
 from models.assignment_schema import (
-    AdjektivDeklinationItem,
     AssignmentContent,
+    BlankFeedback,
     CriterionItem,
     ItemFeedback,
     MultipleChoiceItem,
@@ -13,7 +13,7 @@ from models.assignment_schema import (
     SubmissionAnswers,
     SubmissionFeedback,
 )
-from services.grading_judge import judge_answer
+from services.grading_judge import judge_blank
 from services.llm_service import LLMService
 
 log = structlog.get_logger()
@@ -30,9 +30,9 @@ async def score_submission(
 ) -> tuple[int, int, SubmissionFeedback, str | None]:
     """Compare submitted answers against per-item correctness rules.
 
-    Closed types (MC, REORDER, ADJEKTIV_DEKLINATION) are graded deterministically.
+    Closed types (MC, REORDER) are graded deterministically.
     Criterion types (COMPLETION, FILL_IN_THE_BLANK) call the LLM judge once per
-    item, passing the criterion as rubric.
+    blank; per-blank verdicts AND into the item-level verdict.
 
     Returns (score, max_score, feedback, langfuse_trace_id).
     """
@@ -50,8 +50,6 @@ async def score_submission(
                 feedback = _score_mc(item, user_answer)
             elif isinstance(item, ReorderItem):
                 feedback = _score_reorder(item, user_answer)
-            elif isinstance(item, AdjektivDeklinationItem):
-                feedback = _score_adjektiv(item, user_answer)
             elif isinstance(item, CriterionItem):
                 feedback, trace_id = await _score_criterion(item, user_answer, llm)
                 if first_trace_id is None and trace_id:
@@ -71,38 +69,29 @@ async def score_submission(
 
 def _score_mc(item: MultipleChoiceItem, user_answer: list[str]) -> ItemFeedback:
     submitted = user_answer[0] if user_answer else ""
-    is_correct = normalize(submitted) == normalize(item.correct_answer)
+    correct = next(opt.text for opt in item.options if opt.is_correct)
+    is_correct = normalize(submitted) == normalize(correct)
     return ItemFeedback(
         correct=is_correct,
         user_answer=user_answer,
-        correct_answer=None if is_correct else item.correct_answer,
+        correct_answer=None if is_correct else correct,
         hint=None if is_correct else item.hint,
     )
 
 
 def _score_reorder(item: ReorderItem, user_answer: list[str]) -> ItemFeedback:
-    if len(user_answer) != len(item.correct_tokens):
+    correct_texts = [t.text for t in item.tokens]
+    if len(user_answer) != len(correct_texts):
         is_correct = False
     else:
         is_correct = all(
             normalize(submitted) == normalize(expected)
-            for submitted, expected in zip(user_answer, item.correct_tokens, strict=True)
+            for submitted, expected in zip(user_answer, correct_texts, strict=True)
         )
     return ItemFeedback(
         correct=is_correct,
         user_answer=user_answer,
-        correct_answer=None if is_correct else " ".join(item.correct_tokens),
-        hint=None if is_correct else item.hint,
-    )
-
-
-def _score_adjektiv(item: AdjektivDeklinationItem, user_answer: list[str]) -> ItemFeedback:
-    submitted = user_answer[0] if user_answer else ""
-    is_correct = normalize(submitted) == normalize(item.correct_ending)
-    return ItemFeedback(
-        correct=is_correct,
-        user_answer=user_answer,
-        correct_answer=None if is_correct else item.correct_ending,
+        correct_answer=None if is_correct else " ".join(correct_texts),
         hint=None if is_correct else item.hint,
     )
 
@@ -110,18 +99,51 @@ def _score_adjektiv(item: AdjektivDeklinationItem, user_answer: list[str]) -> It
 async def _score_criterion(
     item: CriterionItem, user_answer: list[str], llm: LLMService
 ) -> tuple[ItemFeedback, str | None]:
-    result = await judge_answer(
-        question=item.question,
-        grading_criterion=item.grading_criterion,
-        example_answer=item.example_answer,
-        student_answers=user_answer,
-        llm=llm,
-    )
+    """One judge call per blank. AND verdicts into the item-level verdict.
+
+    Per-blank rationales are aggregated into ItemFeedback.blank_feedbacks. The
+    first non-None trace_id is returned so the submission row can link to one
+    representative trace.
+    """
+    # Align student answers to blanks by index; pad with empty strings if short.
+    padded_answers = list(user_answer) + [""] * (len(item.blanks) - len(user_answer))
+
+    blank_feedbacks: list[BlankFeedback] = []
+    first_trace_id: str | None = None
+    all_correct = True
+
+    for blank, student_answer in zip(item.blanks, padded_answers[: len(item.blanks)], strict=True):
+        result = await judge_blank(
+            question=item.question,
+            blank=blank,
+            student_answer=student_answer,
+            llm=llm,
+        )
+        if not result.is_correct:
+            all_correct = False
+        if first_trace_id is None and result.raw_result.trace_id:
+            first_trace_id = result.raw_result.trace_id
+
+        blank_feedbacks.append(
+            BlankFeedback(
+                index=blank.index,
+                correct=result.is_correct,
+                rationale=result.rationale,
+                example_answer=None if result.is_correct else blank.example_answer,
+                grading_criterion=None if result.is_correct else blank.grading_criterion,
+            )
+        )
+
+    # Item-level convenience fields show first failing blank's criterion/example so the
+    # existing UI keeps working without per-blank rendering.
+    first_failed = next((bf for bf in blank_feedbacks if not bf.correct), None)
+
     feedback = ItemFeedback(
-        correct=result.is_correct,
+        correct=all_correct,
         user_answer=user_answer,
-        example_answer=None if result.is_correct else item.example_answer,
-        grading_criterion=None if result.is_correct else item.grading_criterion,
-        hint=None if result.is_correct else item.hint,
+        example_answer=first_failed.example_answer if first_failed else None,
+        grading_criterion=first_failed.grading_criterion if first_failed else None,
+        hint=None if all_correct else item.hint,
+        blank_feedbacks=blank_feedbacks,
     )
-    return feedback, result.raw_result.trace_id
+    return feedback, first_trace_id

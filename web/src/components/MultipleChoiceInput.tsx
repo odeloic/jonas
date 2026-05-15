@@ -25,19 +25,19 @@ export default function MultipleChoiceInput({
       <div className="space-y-1.5">
         {item.options.map((opt) => (
           <label
-            key={opt}
+            key={opt.index}
             className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
           >
             <input
               type="radio"
               name={`q-${index}`}
-              value={opt}
-              checked={selected === opt}
-              onChange={() => onChange([opt])}
+              value={opt.text}
+              checked={selected === opt.text}
+              onChange={() => onChange([opt.text])}
               disabled={disabled}
               className="accent-gray-900"
             />
-            {opt}
+            {opt.text}
           </label>
         ))}
       </div>

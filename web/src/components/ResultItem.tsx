@@ -32,19 +32,48 @@ export default function ResultItem({ feedback, item, index }: Props) {
         <>
           {isCriterion ? (
             <>
-              {feedback.example_answer && (
-                <p className="text-sm">
-                  <span className="text-gray-500">Beispielantwort: </span>
-                  <span className="text-gray-900 font-medium">
-                    {feedback.example_answer}
-                  </span>
-                </p>
-              )}
-              {feedback.grading_criterion && (
-                <p className="text-xs text-gray-600">
-                  <span className="text-gray-500">Kriterium: </span>
-                  {feedback.grading_criterion}
-                </p>
+              {feedback.blank_feedbacks && feedback.blank_feedbacks.length > 1 ? (
+                <div className="space-y-2">
+                  {feedback.blank_feedbacks.map((bf) => (
+                    <div
+                      key={bf.index}
+                      className={`text-xs border-l-2 pl-2 ${
+                        bf.correct ? "border-green-700" : "border-red-700"
+                      }`}
+                    >
+                      <p className="text-gray-700">
+                        <span className="text-gray-500">Lücke {bf.index + 1}: </span>
+                        {bf.correct ? "richtig" : "falsch"}
+                      </p>
+                      {!bf.correct && bf.example_answer && (
+                        <p className="text-gray-600">
+                          <span className="text-gray-500">Beispiel: </span>
+                          {bf.example_answer}
+                        </p>
+                      )}
+                      {!bf.correct && bf.grading_criterion && (
+                        <p className="text-gray-500">{bf.grading_criterion}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {feedback.example_answer && (
+                    <p className="text-sm">
+                      <span className="text-gray-500">Beispielantwort: </span>
+                      <span className="text-gray-900 font-medium">
+                        {feedback.example_answer}
+                      </span>
+                    </p>
+                  )}
+                  {feedback.grading_criterion && (
+                    <p className="text-xs text-gray-600">
+                      <span className="text-gray-500">Kriterium: </span>
+                      {feedback.grading_criterion}
+                    </p>
+                  )}
+                </>
               )}
             </>
           ) : (

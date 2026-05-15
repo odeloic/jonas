@@ -1,16 +1,15 @@
-"""Per-type scoring TDD tests for ODE assignment correction cutover.
+"""Per-type scoring TDD tests for the structured assignment schema.
 
-These tests pin down the new scoring contract item-by-item:
+These tests pin down the scoring contract item-by-item:
 
-- MULTIPLE_CHOICE: byte-equal (after normalize) against `correct_answer`. No judge call.
-- REORDER: per-index equality between submitted list and stored `correct_tokens`. No judge.
-- ADJEKTIV_DEKLINATION: byte-equal against `correct_ending`. No judge.
-- COMPLETION / FILL_IN_THE_BLANK: judge call against `grading_criterion` (one call per item,
-  regardless of blank count). `example_answer` is informational only.
+- MULTIPLE_CHOICE: byte-equal (after normalize) against the single is_correct option. No judge.
+- REORDER: per-index equality between submitted list and stored tokens[].text. No judge.
+- COMPLETION / FILL_IN_THE_BLANK: ONE judge call PER BLANK. Verdicts AND into item-level.
+  Per-blank rationales aggregated into ItemFeedback.blank_feedbacks.
 
-The closed-type cases pass a stub LLM that raises if invoked — proving they take the
-deterministic path. Criterion cases drive a fake judge that records its arguments so the
-test can assert what the judge sees.
+Closed-type cases pass a stub LLM that raises if invoked — proves they take the
+deterministic path. Criterion cases drive a fake judge that records every call so the
+test can assert what the judge saw, per blank.
 """
 
 from __future__ import annotations
@@ -21,12 +20,14 @@ from typing import Any
 import pytest
 
 from models.assignment_schema import (
-    AdjektivDeklinationItem,
     AssignmentContent,
     AssignmentSection,
+    Blank,
     CriterionItem,
     MultipleChoiceItem,
+    Option,
     ReorderItem,
+    ReorderToken,
     SectionAnswers,
     SectionType,
     SubmissionAnswers,
@@ -48,14 +49,15 @@ class _RecordedCall:
     question: str
     grading_criterion: str
     example_answer: str
-    student_answers: list[str]
+    is_sentence_initial: bool
+    student_answer: str
 
 
 @dataclass
 class _FakeJudge:
-    """Drop-in replacement for services.grading_judge.judge_answer.
+    """Drop-in replacement for services.grading_judge.judge_blank.
 
-    Configure `verdicts` as an iterable of bools — each call pops the next verdict.
+    Configure `verdicts` as a list of bools — each call pops the next verdict.
     Records every call in `calls` for assertion.
     """
 
@@ -66,17 +68,17 @@ class _FakeJudge:
         self,
         *,
         question: str,
-        grading_criterion: str,
-        example_answer: str,
-        student_answers: list[str],
+        blank: Blank,
+        student_answer: str,
         llm,  # noqa: ANN001
     ) -> JudgeResult:
         self.calls.append(
             _RecordedCall(
                 question=question,
-                grading_criterion=grading_criterion,
-                example_answer=example_answer,
-                student_answers=list(student_answers),
+                grading_criterion=blank.grading_criterion,
+                example_answer=blank.example_answer,
+                is_sentence_initial=blank.is_sentence_initial,
+                student_answer=student_answer,
             )
         )
         if not self.verdicts:
@@ -98,6 +100,14 @@ def _one_section_answers(items: list[list[str]]) -> SubmissionAnswers:
     return SubmissionAnswers(sections=[SectionAnswers(items=items)])
 
 
+def _mc_options() -> list[Option]:
+    return [
+        Option(index=0, text="A", is_correct=False),
+        Option(index=1, text="B", is_correct=True),
+        Option(index=2, text="C", is_correct=False),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # MULTIPLE_CHOICE
 # ---------------------------------------------------------------------------
@@ -113,8 +123,7 @@ async def test_mc_correct_option_matches():
             MultipleChoiceItem(
                 type=SectionType.MULTIPLE_CHOICE,
                 question="Was passt?",
-                options=["A", "B", "C"],
-                correct_answer="B",
+                options=_mc_options(),
             )
         ],
     )
@@ -135,8 +144,7 @@ async def test_mc_wrong_option_fails():
             MultipleChoiceItem(
                 type=SectionType.MULTIPLE_CHOICE,
                 question="Was passt?",
-                options=["A", "B", "C"],
-                correct_answer="B",
+                options=_mc_options(),
             )
         ],
     )
@@ -159,8 +167,11 @@ async def test_mc_case_insensitive_via_normalize():
             MultipleChoiceItem(
                 type=SectionType.MULTIPLE_CHOICE,
                 question="Was passt?",
-                options=["der Mann", "die Frau", "das Kind"],
-                correct_answer="die Frau",
+                options=[
+                    Option(index=0, text="der Mann", is_correct=False),
+                    Option(index=1, text="die Frau", is_correct=True),
+                    Option(index=2, text="das Kind", is_correct=False),
+                ],
             )
         ],
     )
@@ -175,18 +186,22 @@ async def test_mc_case_insensitive_via_normalize():
 # ---------------------------------------------------------------------------
 
 
+def _reorder_tokens(texts: list[str]) -> list[ReorderToken]:
+    return [ReorderToken(index=i, text=t) for i, t in enumerate(texts)]
+
+
 @pytest.mark.asyncio
 async def test_reorder_per_position_correct():
-    correct_tokens = ["Ich", "gehe", "morgen", "ins", "Kino"]
+    correct = ["Ich", "gehe", "morgen", "ins", "Kino"]
     section = AssignmentSection(
         type=SectionType.REORDER,
         title="Reorder",
         instructions="x",
-        items=[ReorderItem(type=SectionType.REORDER, correct_tokens=correct_tokens)],
+        items=[ReorderItem(type=SectionType.REORDER, tokens=_reorder_tokens(correct))],
     )
     score, max_score, _, _ = await scoring_module.score_submission(
         _one_section_content(section),
-        _one_section_answers([list(correct_tokens)]),
+        _one_section_answers([list(correct)]),
         _BoomLLM(),
     )
     assert (score, max_score) == (1, 1)
@@ -201,7 +216,7 @@ async def test_reorder_wrong_position_fails():
         items=[
             ReorderItem(
                 type=SectionType.REORDER,
-                correct_tokens=["Ich", "gehe", "morgen", "ins", "Kino"],
+                tokens=_reorder_tokens(["Ich", "gehe", "morgen", "ins", "Kino"]),
             )
         ],
     )
@@ -223,7 +238,7 @@ async def test_reorder_wrong_length_fails():
         items=[
             ReorderItem(
                 type=SectionType.REORDER,
-                correct_tokens=["Ich", "gehe", "morgen", "ins", "Kino"],
+                tokens=_reorder_tokens(["Ich", "gehe", "morgen", "ins", "Kino"]),
             )
         ],
     )
@@ -236,62 +251,14 @@ async def test_reorder_wrong_length_fails():
 
 
 # ---------------------------------------------------------------------------
-# ADJEKTIV_DEKLINATION
+# COMPLETION / FILL_IN_THE_BLANK — criterion-based, ONE judge call per blank
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_adjektiv_deklination_correct_ending():
-    section = AssignmentSection(
-        type=SectionType.ADJEKTIV_DEKLINATION,
-        title="Adj",
-        instructions="x",
-        items=[
-            AdjektivDeklinationItem(
-                type=SectionType.ADJEKTIV_DEKLINATION,
-                question="Der nett___ Mann lacht.",
-                correct_ending="-e",
-                candidate_endings=["-e", "-er", "-en", "-es"],
-            )
-        ],
-    )
-    score, _, _, _ = await scoring_module.score_submission(
-        _one_section_content(section), _one_section_answers([["-e"]]), _BoomLLM()
-    )
-    assert score == 1
-
-
-@pytest.mark.asyncio
-async def test_adjektiv_deklination_wrong_ending_fails():
-    section = AssignmentSection(
-        type=SectionType.ADJEKTIV_DEKLINATION,
-        title="Adj",
-        instructions="x",
-        items=[
-            AdjektivDeklinationItem(
-                type=SectionType.ADJEKTIV_DEKLINATION,
-                question="Der nett___ Mann lacht.",
-                correct_ending="-e",
-                candidate_endings=["-e", "-er", "-en", "-es"],
-            )
-        ],
-    )
-    score, _, feedback, _ = await scoring_module.score_submission(
-        _one_section_content(section), _one_section_answers([["-er"]]), _BoomLLM()
-    )
-    assert score == 0
-    assert feedback.sections[0].items[0].correct_answer == "-e"
-
-
-# ---------------------------------------------------------------------------
-# COMPLETION / FILL_IN_THE_BLANK — criterion-based
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_completion_single_blank_judge_sees_criterion(monkeypatch):
+async def test_completion_single_blank_judge_sees_blank(monkeypatch):
     fake = _FakeJudge(verdicts=[True])
-    monkeypatch.setattr(scoring_module, "judge_answer", fake)
+    monkeypatch.setattr(scoring_module, "judge_blank", fake)
 
     section = AssignmentSection(
         type=SectionType.COMPLETION,
@@ -300,9 +267,15 @@ async def test_completion_single_blank_judge_sees_criterion(monkeypatch):
         items=[
             CriterionItem(
                 type=SectionType.COMPLETION,
-                question="Ich helfe ___ (das Kind).",
-                grading_criterion="Dativ Singular Neutrum von 'das Kind'.",
-                example_answer="dem Kind",
+                question="Setze 'das Kind' in den Dativ.",
+                blanks=[
+                    Blank(
+                        index=0,
+                        grading_criterion="Dativ Singular Neutrum von 'das Kind'.",
+                        example_answer="dem Kind",
+                        is_sentence_initial=False,
+                    )
+                ],
             )
         ],
     )
@@ -311,18 +284,24 @@ async def test_completion_single_blank_judge_sees_criterion(monkeypatch):
     )
 
     assert score == 1
-    assert feedback.sections[0].items[0].correct is True
+    item_fb = feedback.sections[0].items[0]
+    assert item_fb.correct is True
     assert len(fake.calls) == 1
     call = fake.calls[0]
     assert call.grading_criterion == "Dativ Singular Neutrum von 'das Kind'."
     assert call.example_answer == "dem Kind"
-    assert call.student_answers == ["dem Kind"]
+    assert call.student_answer == "dem Kind"
+    assert call.is_sentence_initial is False
+    # Per-blank verdicts attached
+    assert item_fb.blank_feedbacks is not None
+    assert len(item_fb.blank_feedbacks) == 1
+    assert item_fb.blank_feedbacks[0].correct is True
 
 
 @pytest.mark.asyncio
-async def test_completion_wrong_shows_example_and_criterion(monkeypatch):
+async def test_completion_wrong_surfaces_first_failed_blank_metadata(monkeypatch):
     fake = _FakeJudge(verdicts=[False])
-    monkeypatch.setattr(scoring_module, "judge_answer", fake)
+    monkeypatch.setattr(scoring_module, "judge_blank", fake)
 
     section = AssignmentSection(
         type=SectionType.COMPLETION,
@@ -331,9 +310,15 @@ async def test_completion_wrong_shows_example_and_criterion(monkeypatch):
         items=[
             CriterionItem(
                 type=SectionType.COMPLETION,
-                question="Ich helfe ___ (das Kind).",
-                grading_criterion="Dativ Singular Neutrum von 'das Kind'.",
-                example_answer="dem Kind",
+                question="Setze 'das Kind' in den Dativ.",
+                blanks=[
+                    Blank(
+                        index=0,
+                        grading_criterion="Dativ Singular Neutrum von 'das Kind'.",
+                        example_answer="dem Kind",
+                        is_sentence_initial=False,
+                    )
+                ],
                 hint="Dativ-Endung im Neutrum",
             )
         ],
@@ -347,12 +332,14 @@ async def test_completion_wrong_shows_example_and_criterion(monkeypatch):
     assert fb.example_answer == "dem Kind"
     assert fb.grading_criterion == "Dativ Singular Neutrum von 'das Kind'."
     assert fb.hint == "Dativ-Endung im Neutrum"
+    assert fb.blank_feedbacks is not None
+    assert fb.blank_feedbacks[0].correct is False
 
 
 @pytest.mark.asyncio
-async def test_completion_multi_blank_single_judge_call(monkeypatch):
-    fake = _FakeJudge(verdicts=[True])
-    monkeypatch.setattr(scoring_module, "judge_answer", fake)
+async def test_completion_multi_blank_one_call_per_blank(monkeypatch):
+    fake = _FakeJudge(verdicts=[True, True])
+    monkeypatch.setattr(scoring_module, "judge_blank", fake)
 
     section = AssignmentSection(
         type=SectionType.COMPLETION,
@@ -361,31 +348,43 @@ async def test_completion_multi_blank_single_judge_call(monkeypatch):
         items=[
             CriterionItem(
                 type=SectionType.COMPLETION,
-                question="Ich helfe ___ (das Kind) mit ___ (die Hausaufgabe).",
-                grading_criterion=(
-                    "Beide Lücken: Dativ Singular. "
-                    "Lücke 1: 'das Kind' → 'dem Kind'. "
-                    "Lücke 2: 'die Hausaufgabe' → 'der Hausaufgabe'."
-                ),
-                example_answer="dem Kind / der Hausaufgabe",
+                question="Setze Dativ und Genitiv.",
+                blanks=[
+                    Blank(
+                        index=0,
+                        grading_criterion="Dativ Singular Neutrum von 'das Kind'.",
+                        example_answer="dem Kind",
+                        is_sentence_initial=False,
+                    ),
+                    Blank(
+                        index=1,
+                        grading_criterion="Genitiv Singular Femininum von 'die Hausaufgabe'.",
+                        example_answer="der Hausaufgabe",
+                        is_sentence_initial=False,
+                    ),
+                ],
             )
         ],
     )
-    score, _, _, _ = await scoring_module.score_submission(
+    score, _, feedback, _ = await scoring_module.score_submission(
         _one_section_content(section),
         _one_section_answers([["dem Kind", "der Hausaufgabe"]]),
         _BoomLLM(),
     )
     assert score == 1
-    # One judge call per item, not per blank
-    assert len(fake.calls) == 1
-    assert fake.calls[0].student_answers == ["dem Kind", "der Hausaufgabe"]
+    # One judge call PER BLANK
+    assert len(fake.calls) == 2
+    assert fake.calls[0].student_answer == "dem Kind"
+    assert fake.calls[1].student_answer == "der Hausaufgabe"
+    item_fb = feedback.sections[0].items[0]
+    assert item_fb.blank_feedbacks is not None
+    assert len(item_fb.blank_feedbacks) == 2
 
 
 @pytest.mark.asyncio
 async def test_completion_multi_blank_partial_fails(monkeypatch):
-    fake = _FakeJudge(verdicts=[False])
-    monkeypatch.setattr(scoring_module, "judge_answer", fake)
+    fake = _FakeJudge(verdicts=[True, False])
+    monkeypatch.setattr(scoring_module, "judge_blank", fake)
 
     section = AssignmentSection(
         type=SectionType.COMPLETION,
@@ -394,9 +393,21 @@ async def test_completion_multi_blank_partial_fails(monkeypatch):
         items=[
             CriterionItem(
                 type=SectionType.COMPLETION,
-                question="Ich helfe ___ (das Kind) mit ___ (die Hausaufgabe).",
-                grading_criterion="Beide Lücken: Dativ Singular.",
-                example_answer="dem Kind / der Hausaufgabe",
+                question="Setze Dativ und Genitiv.",
+                blanks=[
+                    Blank(
+                        index=0,
+                        grading_criterion="Dativ.",
+                        example_answer="dem Kind",
+                        is_sentence_initial=False,
+                    ),
+                    Blank(
+                        index=1,
+                        grading_criterion="Genitiv.",
+                        example_answer="der Hausaufgabe",
+                        is_sentence_initial=False,
+                    ),
+                ],
             )
         ],
     )
@@ -406,13 +417,18 @@ async def test_completion_multi_blank_partial_fails(monkeypatch):
         _BoomLLM(),
     )
     assert score == 0
-    assert feedback.sections[0].items[0].correct is False
+    fb = feedback.sections[0].items[0]
+    assert fb.correct is False
+    # First-failed blank's example surfaces at item level for the existing UI
+    assert fb.example_answer == "der Hausaufgabe"
+    assert fb.blank_feedbacks is not None
+    assert [bf.correct for bf in fb.blank_feedbacks] == [True, False]
 
 
 @pytest.mark.asyncio
 async def test_fill_in_the_blank_routes_through_judge(monkeypatch):
     fake = _FakeJudge(verdicts=[True])
-    monkeypatch.setattr(scoring_module, "judge_answer", fake)
+    monkeypatch.setattr(scoring_module, "judge_blank", fake)
 
     section = AssignmentSection(
         type=SectionType.FILL_IN_THE_BLANK,
@@ -421,11 +437,17 @@ async def test_fill_in_the_blank_routes_through_judge(monkeypatch):
         items=[
             CriterionItem(
                 type=SectionType.FILL_IN_THE_BLANK,
-                question="Die Tasche ___ ist moderner als meine.",
-                grading_criterion=(
-                    "Genitiv einer femininen Nominalphrase, die eine Person bezeichnet."
-                ),
-                example_answer="meiner Schwester",
+                question="Setze einen femininen Genitiv ein.",
+                blanks=[
+                    Blank(
+                        index=0,
+                        grading_criterion=(
+                            "Genitiv einer femininen Nominalphrase, die eine Person bezeichnet."
+                        ),
+                        example_answer="meiner Schwester",
+                        is_sentence_initial=False,
+                    )
+                ],
             )
         ],
     )
@@ -436,4 +458,4 @@ async def test_fill_in_the_blank_routes_through_judge(monkeypatch):
     )
     assert score == 1
     assert len(fake.calls) == 1
-    assert fake.calls[0].student_answers == ["meiner Freundin"]
+    assert fake.calls[0].student_answer == "meiner Freundin"

@@ -11,6 +11,7 @@ import anthropic
 import openai
 import structlog
 from pydantic import BaseModel as PydanticBaseModel
+from pydantic import ValidationError
 
 from config import settings
 
@@ -172,16 +173,63 @@ class LLMService:
         model: str | None = None,
         max_tokens: int = 4096,
         trace_name: str | None = None,
+        max_validation_retries: int = 2,
     ) -> LLMResult[T]:
+        """Structured-output call with automatic retry on Pydantic ValidationError.
+
+        On validation failure, appends a corrective user turn quoting the error and
+        re-calls the model. Up to `max_validation_retries` retries (default 2 → 3 total
+        attempts). The final attempt re-raises if validation still fails.
+        """
         chosen = model or settings.default_model
-        if self._is_anthropic(chosen):
-            result = await self._anthropic_structured(chosen, messages, response_format, max_tokens)
-        else:
-            result = await self._openai_structured(chosen, messages, response_format, max_tokens)
-        result.trace_id = self._track_generation(
-            trace_name=trace_name, messages=messages, result=result
-        )
-        return result
+        attempt_messages = list(messages)
+
+        for attempt in range(max_validation_retries + 1):
+            try:
+                if self._is_anthropic(chosen):
+                    result = await self._anthropic_structured(
+                        chosen, attempt_messages, response_format, max_tokens
+                    )
+                else:
+                    result = await self._openai_structured(
+                        chosen, attempt_messages, response_format, max_tokens
+                    )
+                result.trace_id = self._track_generation(
+                    trace_name=trace_name, messages=attempt_messages, result=result
+                )
+                return result
+            except ValidationError as exc:
+                if attempt >= max_validation_retries:
+                    log.error(
+                        "llm_structured_validation_exhausted",
+                        model=chosen,
+                        attempts=attempt + 1,
+                        error=str(exc)[:500],
+                    )
+                    raise
+                log.warning(
+                    "llm_structured_validation_retry",
+                    model=chosen,
+                    attempt=attempt + 1,
+                    error=str(exc)[:500],
+                )
+                attempt_messages = attempt_messages + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Deine vorherige Antwort hat die Schema-Validierung nicht "
+                            "bestanden. Pydantic-Fehler:\n\n"
+                            f"{exc}\n\n"
+                            "Generiere die Ausgabe neu und korrigiere das Problem. "
+                            "Halte dich strikt an die in der Systemnachricht definierten "
+                            "Feldnamen und Typen. Antworte ausschließlich mit gültigem "
+                            "JSON gemäß Schema."
+                        ),
+                    }
+                ]
+
+        # Unreachable — loop either returns or raises.
+        raise RuntimeError("complete_structured retry loop exited unexpectedly")
 
     async def _anthropic_structured[T: PydanticBaseModel](
         self,
@@ -190,6 +238,9 @@ class LLMService:
         response_format: type[T],
         max_tokens: int,
     ) -> LLMResult[T]:
+        # messages.parse() handles the strict-mode schema transformation (injecting
+        # additionalProperties: false, stripping unsupported keywords like minLength/
+        # maximum, etc.) that raw model_json_schema() output lacks.
         client = self._get_anthropic()
         bare = self._bare_model(model)
         system_msg, user_messages = self._prepare_anthropic_messages(messages)
@@ -210,20 +261,20 @@ class LLMService:
 
         text_blocks = [b for b in response.content if b.type == "text"]
         raw = text_blocks[0].text if text_blocks else ""
-
-        if response.parsed_output is None:
-            log.error(
-                "llm_no_parsed_output",
-                model=model,
-                stop_reason=response.stop_reason,
-            )
+        if not raw:
+            log.error("llm_no_output_text", model=model, stop_reason=response.stop_reason)
             raise ValueError(
-                f"Anthropic returned no parsed output for {response_format.__name__} "
+                f"Anthropic returned no text output for {response_format.__name__} "
                 f"(stop_reason={response.stop_reason})"
             )
 
+        # Prefer the SDK-parsed object; fall back to manual validation so any custom
+        # @field_validator / @model_validator failures still surface as ValidationError
+        # (caught by complete_structured's retry loop).
+        parsed = response.parsed_output or response_format.model_validate_json(raw)
+
         result = LLMResult(
-            parsed=response.parsed_output,
+            parsed=parsed,
             raw_response=raw,
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,

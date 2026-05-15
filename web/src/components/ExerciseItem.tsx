@@ -1,5 +1,4 @@
 import type { ExerciseItem } from "../api/types";
-import AdjektivDeklinationInput from "./AdjektivDeklinationInput";
 import CriterionInput from "./CriterionInput";
 import MultipleChoiceInput from "./MultipleChoiceInput";
 import ReorderInput from "./ReorderInput";
@@ -33,8 +32,6 @@ function renderInput(props: Props) {
       return <MultipleChoiceInput {...props} item={item} />;
     case "REORDER":
       return <ReorderInput {...props} item={item} />;
-    case "ADJEKTIV_DEKLINATION":
-      return <AdjektivDeklinationInput {...props} item={item} />;
     case "COMPLETION":
     case "FILL_IN_THE_BLANK":
       return <CriterionInput {...props} item={item} />;

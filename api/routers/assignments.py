@@ -12,7 +12,6 @@ from config import settings
 from db import async_session
 from models.assignment import Assignment
 from models.assignment_schema import (
-    AdjektivDeklinationItem,
     AssignmentContent,
     CriterionItem,
     MultipleChoiceItem,
@@ -44,6 +43,19 @@ class AssignmentSummary(BaseModel):
     created_at: datetime
 
 
+class OptionView(BaseModel):
+    """Public view of an Option — text and index only, no is_correct."""
+
+    index: int
+    text: str
+
+
+class BlankView(BaseModel):
+    """Public view of a Blank — just the index; grading data is server-only."""
+
+    index: int
+
+
 class ReorderExerciseItem(BaseModel):
     type: Literal[SectionType.REORDER]
     tokens: list[str]  # shuffled for client display
@@ -52,25 +64,17 @@ class ReorderExerciseItem(BaseModel):
 class MultipleChoiceExerciseItem(BaseModel):
     type: Literal[SectionType.MULTIPLE_CHOICE]
     question: str
-    options: list[str]
-
-
-class AdjektivDeklinationExerciseItem(BaseModel):
-    type: Literal[SectionType.ADJEKTIV_DEKLINATION]
-    question: str
-    candidate_endings: list[str]
+    options: list[OptionView]
 
 
 class CriterionExerciseItem(BaseModel):
     type: Literal[SectionType.COMPLETION, SectionType.FILL_IN_THE_BLANK]
     question: str
+    blanks: list[BlankView]
 
 
 ExerciseItem = Annotated[
-    ReorderExerciseItem
-    | MultipleChoiceExerciseItem
-    | AdjektivDeklinationExerciseItem
-    | CriterionExerciseItem,
+    ReorderExerciseItem | MultipleChoiceExerciseItem | CriterionExerciseItem,
     Field(discriminator="type"),
 ]
 
@@ -105,19 +109,21 @@ class SubmitRequest(BaseModel):
 def _project_item_for_exercise(item) -> ExerciseItem:
     """Hide answer-bearing fields; expose only what the UI needs to render."""
     if isinstance(item, ReorderItem):
-        shuffled = list(item.correct_tokens)
+        shuffled = [t.text for t in item.tokens]
         random.shuffle(shuffled)
         return ReorderExerciseItem(type=item.type, tokens=shuffled)
     if isinstance(item, MultipleChoiceItem):
         return MultipleChoiceExerciseItem(
-            type=item.type, question=item.question, options=item.options
-        )
-    if isinstance(item, AdjektivDeklinationItem):
-        return AdjektivDeklinationExerciseItem(
-            type=item.type, question=item.question, candidate_endings=item.candidate_endings
+            type=item.type,
+            question=item.question,
+            options=[OptionView(index=o.index, text=o.text) for o in item.options],
         )
     if isinstance(item, CriterionItem):
-        return CriterionExerciseItem(type=item.type, question=item.question)
+        return CriterionExerciseItem(
+            type=item.type,
+            question=item.question,
+            blanks=[BlankView(index=b.index) for b in item.blanks],
+        )
     raise TypeError(f"Unknown item type: {type(item).__name__}")
 
 

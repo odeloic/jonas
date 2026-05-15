@@ -11,14 +11,22 @@ cp .env.example .env
 
 ## Commands
 
+The `Makefile` is the primary entry point. Run `make help` for the full list.
+
 ```bash
-# Start the stack
+make up       # start containers, run migrations, print diagnostics
+make down     # stop containers (named volumes persist)
+make migrate  # apply pending Alembic migrations
+make logs     # tail all logs (use SERVICE=api to scope)
+make web      # run the Vite dev server in web/
+make diag     # compose ps + per-service health probes
+```
+
+Raw `docker compose` commands still work for one-offs:
+
+```bash
 docker compose up -d
-
-# Stop the stack (data persists in named volumes)
 docker compose down
-
-# Tail logs
 docker compose logs -f [service]
 ```
 

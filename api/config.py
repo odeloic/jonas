@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     default_model: str = "claude-haiku-4-5-20251001"
     # default_model: str = "gpt-5-mini-2025-08-07"
     triage_model: str = "claude-haiku-4-5-20251001"
-    assignment_model: str = "claude-haiku-4-5-20251001"
+    assignment_model: str = "claude-sonnet-4-6"
     extraction_model: str = "claude-haiku-4-5-20251001"
     qdrant_url: str = "http://qdrant:6333"
     qdrant_collection: str = "grammar_rules"

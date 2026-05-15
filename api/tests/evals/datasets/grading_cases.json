@@ -1,332 +1,626 @@
 [
   {
-    "id": "reorder_001",
-    "exercise_type": "REORDER",
-    "question": "gehe / heute / ins / Kino / ich",
-    "grammar_rule": "Verbzweitstellung",
-    "correct_answer": "Ich gehe heute ins Kino.",
-    "test_answer": "Ich gehe heute ins Kino.",
-    "expected_correct": true,
-    "bucket": "exactly_correct",
-    "note": "Exact word order match"
-  },
-  {
-    "id": "reorder_002",
-    "exercise_type": "REORDER",
-    "question": "gehe / heute / ins / Kino / ich",
-    "grammar_rule": "Verbzweitstellung",
-    "correct_answer": "Ich gehe heute ins Kino.",
-    "test_answer": "Heute gehe ich ins Kino.",
-    "expected_correct": true,
-    "bucket": "semantic_correct",
-    "note": "Valid V2 fronting of temporal adverb — exact match wrongly fails this"
-  },
-  {
-    "id": "reorder_003",
-    "exercise_type": "REORDER",
-    "question": "gehe / heute / ins / Kino / ich",
-    "grammar_rule": "Verbzweitstellung",
-    "correct_answer": "Ich gehe heute ins Kino.",
-    "test_answer": "Ins Kino gehe ich heute.",
-    "expected_correct": true,
-    "bucket": "semantic_correct",
-    "note": "Valid V2 fronting of directional PP — exact match wrongly fails this"
-  },
-  {
-    "id": "reorder_004",
-    "exercise_type": "REORDER",
-    "question": "kommt / mein Bruder / morgen / nach Hause",
-    "grammar_rule": "Verbzweitstellung",
-    "correct_answer": "Mein Bruder kommt morgen nach Hause.",
-    "test_answer": "Morgen mein Bruder kommt nach Hause.",
-    "expected_correct": false,
-    "bucket": "clearly_wrong",
-    "note": "Verb not in position 2 — hard V2 violation"
-  },
-  {
-    "id": "reorder_005",
-    "exercise_type": "REORDER",
-    "question": "hat / gestern / Maria / das Buch / gelesen",
-    "grammar_rule": "Verbzweitstellung",
-    "correct_answer": "Maria hat gestern das Buch gelesen.",
-    "test_answer": "Gestern hat Maria das Buch gelesen.",
-    "expected_correct": true,
-    "bucket": "exactly_correct",
-    "note": "Valid Vorfeld fronting with Perfekt — also an exact match variant"
-  },
-  {
-    "id": "reorder_006",
-    "exercise_type": "REORDER",
-    "question": "hat / gestern / Maria / das Buch / gelesen",
-    "grammar_rule": "Verbzweitstellung",
-    "correct_answer": "Maria hat gestern das Buch gelesen.",
-    "test_answer": "Das Buch hat Maria gelesen gestern.",
-    "expected_correct": false,
-    "bucket": "clearly_wrong",
-    "note": "Temporal adverb displaced after past participle — not idiomatic German"
-  },
-  {
     "id": "completion_001",
     "exercise_type": "COMPLETION",
-    "question": "Ich ___ gestern ins Kino gegangen. (gehen)",
+    "question": "Setze das Hilfsverb im Perfekt ein: 'Ich ... gestern ins Kino gegangen.'",
     "grammar_rule": "Perfekt mit sein — Bewegungsverben",
-    "correct_answer": "bin",
-    "test_answer": "bin",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Hilfsverb 'sein' im Perfekt, 1. Person Singular Präsens — also 'bin'. Andere Hilfsverben oder Personenformen sind falsch.",
+        "example_answer": "bin",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["bin"],
     "expected_correct": true,
     "bucket": "exactly_correct",
-    "note": "Correct auxiliary for directed-motion verb"
+    "note": "Exact match"
   },
   {
     "id": "completion_002",
     "exercise_type": "COMPLETION",
-    "question": "Er ___ das Buch gelesen. (lesen)",
+    "question": "Setze das Hilfsverb im Perfekt ein: 'Er ... das Buch gelesen.'",
     "grammar_rule": "Perfekt mit haben — transitive Verben",
-    "correct_answer": "hat",
-    "test_answer": "hat",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Hilfsverb 'haben' im Perfekt, 3. Person Singular Präsens — also 'hat'.",
+        "example_answer": "hat",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["hat"],
     "expected_correct": true,
     "bucket": "exactly_correct",
-    "note": "Correct auxiliary for transitive verb"
+    "note": "Transitive verb requires haben. is_sentence_initial=false — judge must not invent capitalization rule."
   },
   {
     "id": "completion_003",
     "exercise_type": "COMPLETION",
-    "question": "Das Wetter ___ gestern sehr schön. (sein)",
-    "grammar_rule": "Präteritum von sein",
-    "correct_answer": "war",
-    "test_answer": "ist gewesen",
+    "question": "Setze die Vergangenheitsform von 'sein' ein: 'Das Wetter ... gestern sehr schön.'",
+    "grammar_rule": "Vergangenheitsform von sein (Präteritum oder Perfekt)",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Vergangenheitsform von 'sein' in der 3. Person Singular. Akzeptiert: Präteritum 'war' UND Perfekt 'ist gewesen' (beides ist im gesprochenen Deutsch korrekt).",
+        "example_answer": "war",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["ist gewesen"],
     "expected_correct": true,
     "bucket": "semantic_correct",
-    "note": "Perfekt of sein is equivalent to Präteritum in spoken German context"
+    "note": "Perfekt of sein equivalent to Präteritum"
   },
   {
     "id": "completion_004",
     "exercise_type": "COMPLETION",
-    "question": "Wir ___ gestern lange geschlafen. (schlafen)",
-    "grammar_rule": "Perfekt mit haben — stative/non-motion Verben",
-    "correct_answer": "haben",
-    "test_answer": "sind",
+    "question": "Setze das Hilfsverb im Perfekt ein: 'Wir ... gestern lange geschlafen.'",
+    "grammar_rule": "Perfekt mit haben — stative Verben",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Hilfsverb 'haben' im Perfekt, 1. Person Plural — also 'haben'. 'schlafen' ist stativ und nimmt 'haben'.",
+        "example_answer": "haben",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["sind"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "schlafen uses haben, not sein"
+    "note": "schlafen takes haben, not sein"
   },
   {
     "id": "completion_005",
     "exercise_type": "COMPLETION",
-    "question": "Sie ___ nach Hause gefahren. (fahren)",
+    "question": "Setze das Hilfsverb im Perfekt ein: 'Sie ... nach Hause gefahren.'",
     "grammar_rule": "Perfekt mit sein — gerichtete Bewegung",
-    "correct_answer": "ist",
-    "test_answer": "hat",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Hilfsverb 'sein' im Perfekt, 3. Person Singular oder Plural — also 'ist' oder 'sind'. 'fahren' mit Richtungsangabe nimmt 'sein'.",
+        "example_answer": "ist",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["hat"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "fahren (directed motion) uses sein, not haben"
+    "note": "fahren with directional 'nach Hause' takes sein"
   },
   {
     "id": "completion_006",
     "exercise_type": "COMPLETION",
-    "question": "Du ___ lange in Berlin gelebt. (leben)",
+    "question": "Setze das Hilfsverb im Perfekt ein: 'Du ... lange in Berlin gelebt.'",
     "grammar_rule": "Perfekt mit haben — stative Verben",
-    "correct_answer": "hast",
-    "test_answer": "bist",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Hilfsverb 'haben' im Perfekt, 2. Person Singular — also 'hast'.",
+        "example_answer": "hast",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["bist"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "leben (stative, no change of state) uses haben"
+    "note": "leben is stative — haben"
   },
   {
-    "id": "adj_001",
-    "exercise_type": "ADJEKTIV_DEKLINATION",
-    "question": "Das ist ein ___ Mann. (alt)",
-    "grammar_rule": "Adjektivdeklination nach unbestimmtem Artikel, Nominativ, maskulin",
-    "correct_answer": "alter",
-    "test_answer": "alter",
+    "id": "completion_dativ_001",
+    "exercise_type": "COMPLETION",
+    "question": "Setze 'das Kind' in den Dativ ein: 'Ich helfe ...'",
+    "grammar_rule": "Dativ-Objekt nach 'helfen'",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Dativ Singular Neutrum der Phrase 'das Kind' — also 'dem Kind'. Jeder andere Kasus ist falsch.",
+        "example_answer": "dem Kind",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["dem Kind"],
     "expected_correct": true,
     "bucket": "exactly_correct",
-    "note": "Strong ending -er after indefinite article in Nominativ masculine"
+    "note": "Exact Dativ match"
   },
   {
-    "id": "adj_002",
-    "exercise_type": "ADJEKTIV_DEKLINATION",
-    "question": "Ich sehe den ___ Hund. (klein)",
-    "grammar_rule": "Adjektivdeklination nach bestimmtem Artikel, Akkusativ, maskulin",
-    "correct_answer": "kleinen",
-    "test_answer": "kleinen",
+    "id": "completion_dativ_002",
+    "exercise_type": "COMPLETION",
+    "question": "Setze 'das Kind' in den Dativ ein: 'Ich helfe ...'",
+    "grammar_rule": "Dativ-Objekt nach 'helfen'",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Dativ Singular Neutrum der Phrase 'das Kind' — also 'dem Kind'. Jeder andere Kasus ist falsch.",
+        "example_answer": "dem Kind",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["das Kind"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "Nominativ instead of Dativ"
+  },
+  {
+    "id": "completion_dativ_multi_001",
+    "exercise_type": "COMPLETION",
+    "question": "Setze beide Phrasen in den Dativ ein: 'Ich helfe ... (das Kind) mit ... (die Hausaufgabe).'",
+    "grammar_rule": "Dativ-Objekt nach 'helfen' und 'mit + Dativ'",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Dativ Singular Neutrum von 'das Kind' — also 'dem Kind'.",
+        "example_answer": "dem Kind",
+        "is_sentence_initial": false
+      },
+      {
+        "index": 1,
+        "grading_criterion": "Dativ Singular Femininum von 'die Hausaufgabe' — also 'der Hausaufgabe'.",
+        "example_answer": "der Hausaufgabe",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["dem Kind", "der Hausaufgabe"],
     "expected_correct": true,
     "bucket": "exactly_correct",
-    "note": "Weak ending -en after definite article in Akkusativ masculine"
+    "note": "Two-blank Dativ both correct"
   },
   {
-    "id": "adj_003",
-    "exercise_type": "ADJEKTIV_DEKLINATION",
-    "question": "Er hilft der ___ Frau. (alt)",
-    "grammar_rule": "Adjektivdeklination nach bestimmtem Artikel, Dativ, feminin",
-    "correct_answer": "alten",
-    "test_answer": "alte",
+    "id": "completion_dativ_multi_002",
+    "exercise_type": "COMPLETION",
+    "question": "Setze beide Phrasen in den Dativ ein: 'Ich helfe ... (das Kind) mit ... (die Hausaufgabe).'",
+    "grammar_rule": "Dativ-Objekt nach 'helfen' und 'mit + Dativ'",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Dativ Singular Neutrum von 'das Kind' — also 'dem Kind'.",
+        "example_answer": "dem Kind",
+        "is_sentence_initial": false
+      },
+      {
+        "index": 1,
+        "grading_criterion": "Dativ Singular Femininum von 'die Hausaufgabe' — also 'der Hausaufgabe'.",
+        "example_answer": "der Hausaufgabe",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["dem Kind", "die Hausaufgabe"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "Dativ requires -en ending, not -e"
+    "note": "Second blank still Nominativ — partial failure must be wrong"
   },
   {
-    "id": "adj_004",
-    "exercise_type": "ADJEKTIV_DEKLINATION",
-    "question": "Das ist ein ___ Buch. (gut)",
-    "grammar_rule": "Adjektivdeklination nach unbestimmtem Artikel, Nominativ, neutrum",
-    "correct_answer": "gutes",
-    "test_answer": "gute",
-    "expected_correct": false,
-    "bucket": "clearly_wrong",
-    "note": "Nominativ neutrum after ein- requires -es, not -e"
+    "id": "completion_genitiv_lexfree_001",
+    "exercise_type": "COMPLETION",
+    "question": "Setze ein Genitivattribut (feminine Person) ein: 'Die Tasche ... ist moderner als meine.'",
+    "grammar_rule": "Genitiv einer femininen Nominalphrase (Personenbezeichnung)",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine feminine Nominalphrase im Genitiv Singular, die eine Person bezeichnet (z. B. eine Verwandte, Freundin, Bekannte). Jede passende feminine Genitiv-Phrase ist korrekt.",
+        "example_answer": "meiner Schwester",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["meiner Schwester"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "Exact match"
   },
   {
-    "id": "adj_005",
-    "exercise_type": "ADJEKTIV_DEKLINATION",
-    "question": "Das Mädchen trägt ein ___ Kleid. (schön)",
-    "grammar_rule": "Adjektivdeklination nach unbestimmtem Artikel, Akkusativ, neutrum",
-    "correct_answer": "schönes",
-    "test_answer": "hübsches",
+    "id": "completion_genitiv_lexfree_002",
+    "exercise_type": "COMPLETION",
+    "question": "Setze ein Genitivattribut (feminine Person) ein: 'Die Tasche ... ist moderner als meine.'",
+    "grammar_rule": "Genitiv einer femininen Nominalphrase (Personenbezeichnung)",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine feminine Nominalphrase im Genitiv Singular, die eine Person bezeichnet (z. B. eine Verwandte, Freundin, Bekannte). Jede passende feminine Genitiv-Phrase ist korrekt.",
+        "example_answer": "meiner Schwester",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["meiner Freundin"],
     "expected_correct": true,
     "bucket": "semantic_correct",
-    "note": "hübsch (pretty) is a valid synonym for schön, with correct neuter Akkusativ ending -es"
+    "note": "'Freundin' is a different lexeme but valid feminine Genitive"
   },
   {
-    "id": "adj_006",
-    "exercise_type": "ADJEKTIV_DEKLINATION",
-    "question": "Sie kauft eine ___ Tasche. (rot)",
-    "grammar_rule": "Adjektivdeklination nach unbestimmtem Artikel, Akkusativ, feminin",
-    "correct_answer": "rote",
-    "test_answer": "roten",
-    "expected_correct": false,
-    "bucket": "clearly_wrong",
-    "note": "Akkusativ feminine after eine requires -e, not -en"
-  },
-  {
-    "id": "fitb_001",
-    "exercise_type": "FILL_IN_THE_BLANK",
-    "question": "Das Buch liegt ___ dem Tisch. (Lage)",
-    "grammar_rule": "Wechselpräpositionen: Dativ für statische Lage",
-    "correct_answer": "auf",
-    "test_answer": "auf",
-    "expected_correct": true,
-    "bucket": "exactly_correct",
-    "note": "auf + Dativ for location (liegen)"
-  },
-  {
-    "id": "fitb_002",
-    "exercise_type": "FILL_IN_THE_BLANK",
-    "question": "Ich lege das Buch ___ den Tisch. (Bewegung)",
-    "grammar_rule": "Wechselpräpositionen: Akkusativ für gerichtete Bewegung",
-    "correct_answer": "auf",
-    "test_answer": "auf",
-    "expected_correct": true,
-    "bucket": "exactly_correct",
-    "note": "auf + Akkusativ for directed movement (legen)"
-  },
-  {
-    "id": "fitb_003",
-    "exercise_type": "FILL_IN_THE_BLANK",
-    "question": "Er kann nicht kommen, ___ er krank ist.",
-    "grammar_rule": "Kausale Nebensätze: weil + Verbendstellung",
-    "correct_answer": "weil",
-    "test_answer": "weil",
+    "id": "completion_genitiv_lexfree_003",
+    "exercise_type": "COMPLETION",
+    "question": "Setze ein Genitivattribut (feminine Person) ein: 'Die Tasche ... ist moderner als meine.'",
+    "grammar_rule": "Genitiv einer femininen Nominalphrase (Personenbezeichnung)",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine feminine Nominalphrase im Genitiv Singular, die eine Person bezeichnet (z. B. eine Verwandte, Freundin, Bekannte). Jede passende feminine Genitiv-Phrase ist korrekt.",
+        "example_answer": "meiner Schwester",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["meiner Mutter"],
     "expected_correct": true,
     "bucket": "semantic_correct",
-    "note": "Correct causal subordinating conjunction — exact match"
+    "note": "Another valid lexical alternative"
   },
   {
-    "id": "fitb_004",
-    "exercise_type": "FILL_IN_THE_BLANK",
-    "question": "Er kann nicht kommen, ___ er krank ist.",
-    "grammar_rule": "Kausale Nebensätze: weil + Verbendstellung",
-    "correct_answer": "weil",
-    "test_answer": "da",
-    "expected_correct": true,
-    "bucket": "semantic_correct",
-    "note": "da is a valid subordinating causal conjunction (Verbendstellung) — semantically equivalent to weil"
-  },
-  {
-    "id": "fitb_005",
-    "exercise_type": "FILL_IN_THE_BLANK",
-    "question": "Er kann nicht kommen, ___ er krank ist.",
-    "grammar_rule": "Kausale Nebensätze: weil + Verbendstellung",
-    "correct_answer": "weil",
-    "test_answer": "denn",
+    "id": "completion_genitiv_lexfree_004",
+    "exercise_type": "COMPLETION",
+    "question": "Setze ein Genitivattribut (feminine Person) ein: 'Die Tasche ... ist moderner als meine.'",
+    "grammar_rule": "Genitiv einer femininen Nominalphrase (Personenbezeichnung)",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine feminine Nominalphrase im Genitiv Singular, die eine Person bezeichnet (z. B. eine Verwandte, Freundin, Bekannte). Jede passende feminine Genitiv-Phrase ist korrekt.",
+        "example_answer": "meiner Schwester",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["meine Schwester"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "denn is a coordinating conjunction (no Verbendstellung) — wrong type for this clause structure"
+    "note": "Nominativ form — fails Genitive criterion"
   },
   {
-    "id": "fitb_006",
-    "exercise_type": "FILL_IN_THE_BLANK",
-    "question": "Sie ___ heute nicht arbeiten. (Bedeutung: keine Notwendigkeit, müssen)",
-    "grammar_rule": "Modalverben: nicht müssen = keine Notwendigkeit",
-    "correct_answer": "muss",
-    "test_answer": "darf",
+    "id": "completion_genitiv_lexfree_005",
+    "exercise_type": "COMPLETION",
+    "question": "Setze ein Genitivattribut (feminine Person) ein: 'Die Tasche ... ist moderner als meine.'",
+    "grammar_rule": "Genitiv einer femininen Nominalphrase (Personenbezeichnung)",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine feminine Nominalphrase im Genitiv Singular, die eine Person bezeichnet (z. B. eine Verwandte, Freundin, Bekannte). Jede passende feminine Genitiv-Phrase ist korrekt.",
+        "example_answer": "meiner Schwester",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["meines Bruders"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "nicht dürfen = not allowed; nicht müssen = no obligation — different meaning"
+    "note": "Masculine Genitive — wrong gender"
   },
   {
-    "id": "mc_001",
-    "exercise_type": "MULTIPLE_CHOICE",
-    "question": "Ich ___ morgen nach München. [fahre / fährt / fahren / gefahren]",
-    "grammar_rule": "Verbkonjugation Präsens, 1. Person Singular",
-    "correct_answer": "fahre",
-    "test_answer": "fahre",
+    "id": "fitb_wechselprep_001",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die korrekte Wechselpräposition ein: 'Das Buch liegt ... dem Tisch.'",
+    "grammar_rule": "Wechselpräpositionen — Dativ für statische Lage",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine Wechselpräposition, die mit Dativ statische Lage auf einer horizontalen Oberfläche beschreibt — also 'auf'.",
+        "example_answer": "auf",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["auf"],
     "expected_correct": true,
     "bucket": "exactly_correct",
-    "note": "Correct 1st person singular conjugation"
+    "note": "auf + Dativ for static location"
   },
   {
-    "id": "mc_002",
-    "exercise_type": "MULTIPLE_CHOICE",
-    "question": "Das ist ___ Hund meines Vaters. [der / die / das / den]",
-    "grammar_rule": "Artikelwahl im Nominativ, maskulin",
-    "correct_answer": "der",
-    "test_answer": "der",
+    "id": "fitb_wechselprep_002",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die korrekte Wechselpräposition ein: 'Ich lege das Buch ... den Tisch.'",
+    "grammar_rule": "Wechselpräpositionen — Akkusativ für gerichtete Bewegung",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine Wechselpräposition, die mit Akkusativ gerichtete Bewegung auf eine horizontale Oberfläche beschreibt — also 'auf'.",
+        "example_answer": "auf",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["auf"],
     "expected_correct": true,
     "bucket": "exactly_correct",
-    "note": "Correct Nominativ masculine definite article"
+    "note": "auf + Akkusativ for directed motion"
   },
   {
-    "id": "mc_003",
-    "exercise_type": "MULTIPLE_CHOICE",
-    "question": "Er interessiert sich ___ Musik. [für / an / mit / bei]",
-    "grammar_rule": "Feste Präpositionen mit Reflexivverben: sich interessieren für",
-    "correct_answer": "für",
-    "test_answer": "für",
+    "id": "fitb_konnektor_001",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die kausale subordinierende Konjunktion ein: 'Er kann nicht kommen, ... er krank ist.'",
+    "grammar_rule": "Kausale Nebensätze: subordinierende Konjunktion + Verbendstellung",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine subordinierende kausale Konjunktion, die Verbendstellung erfordert. Akzeptiert: 'weil', 'da'. NICHT akzeptiert: koordinierende Konjunktionen wie 'denn' (verlangen V2-Stellung).",
+        "example_answer": "weil",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["weil"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "weil exact"
+  },
+  {
+    "id": "fitb_konnektor_002",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die kausale subordinierende Konjunktion ein: 'Er kann nicht kommen, ... er krank ist.'",
+    "grammar_rule": "Kausale Nebensätze: subordinierende Konjunktion + Verbendstellung",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine subordinierende kausale Konjunktion, die Verbendstellung erfordert. Akzeptiert: 'weil', 'da'. NICHT akzeptiert: koordinierende Konjunktionen wie 'denn' (verlangen V2-Stellung).",
+        "example_answer": "weil",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["da"],
     "expected_correct": true,
     "bucket": "semantic_correct",
-    "note": "Correct fixed preposition — sich interessieren für"
+    "note": "da is valid subordinator"
   },
   {
-    "id": "mc_004",
-    "exercise_type": "MULTIPLE_CHOICE",
-    "question": "Er interessiert sich ___ Musik. [für / an / mit / bei]",
-    "grammar_rule": "Feste Präpositionen mit Reflexivverben: sich interessieren für",
-    "correct_answer": "für",
-    "test_answer": "an",
+    "id": "fitb_konnektor_003",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die kausale subordinierende Konjunktion ein: 'Er kann nicht kommen, ... er krank ist.'",
+    "grammar_rule": "Kausale Nebensätze: subordinierende Konjunktion + Verbendstellung",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine subordinierende kausale Konjunktion, die Verbendstellung erfordert. Akzeptiert: 'weil', 'da'. NICHT akzeptiert: koordinierende Konjunktionen wie 'denn' (verlangen V2-Stellung).",
+        "example_answer": "weil",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["denn"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "sich interessieren für — not an; an would require a different verb (interessiert an is not standard)"
+    "note": "denn is coordinating — wrong syntactic class"
   },
   {
-    "id": "mc_005",
-    "exercise_type": "MULTIPLE_CHOICE",
-    "question": "Ich habe ___ Brief geschrieben. [einen / ein / eine / einem]",
-    "grammar_rule": "Indefinitartikel Akkusativ, maskulin",
-    "correct_answer": "einen",
-    "test_answer": "einen",
+    "id": "fitb_modal_001",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze das Modalverb für fehlende Notwendigkeit ein: 'Sie ... heute nicht arbeiten.'",
+    "grammar_rule": "Modalverben — 'nicht müssen' für fehlende Notwendigkeit",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Modalverb 'müssen' in der 3. Person Singular Präsens — also 'muss'. Andere Modalverben drücken nicht 'keine Notwendigkeit' aus.",
+        "example_answer": "muss",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["darf"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "nicht dürfen ≠ nicht müssen"
+  },
+  {
+    "id": "completion_konjunktiv_001",
+    "exercise_type": "COMPLETION",
+    "question": "Setze 'haben' im Konjunktiv II ein: 'Wenn ich Zeit ..., würde ich ins Kino gehen.'",
+    "grammar_rule": "Konjunktiv II von 'haben' im Nebensatz",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Konjunktiv II von 'haben', 1. Person Singular — also 'hätte'. Indikativ-Formen sind falsch.",
+        "example_answer": "hätte",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["hätte"],
     "expected_correct": true,
-    "bucket": "semantic_correct",
-    "note": "Correct Akkusativ masculine indefinite article"
+    "bucket": "exactly_correct",
+    "note": "Konjunktiv II hätte"
   },
   {
-    "id": "mc_006",
-    "exercise_type": "MULTIPLE_CHOICE",
-    "question": "Ich habe ___ Brief geschrieben. [einen / ein / eine / einem]",
-    "grammar_rule": "Indefinitartikel Akkusativ, maskulin",
-    "correct_answer": "einen",
-    "test_answer": "ein",
+    "id": "completion_konjunktiv_002",
+    "exercise_type": "COMPLETION",
+    "question": "Setze 'haben' im Konjunktiv II ein: 'Wenn ich Zeit ..., würde ich ins Kino gehen.'",
+    "grammar_rule": "Konjunktiv II von 'haben' im Nebensatz",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Konjunktiv II von 'haben', 1. Person Singular — also 'hätte'. Indikativ-Formen sind falsch.",
+        "example_answer": "hätte",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["habe"],
     "expected_correct": false,
     "bucket": "clearly_wrong",
-    "note": "ein is Nominativ/Akkusativ neutrum — wrong for masculine Akkusativ"
+    "note": "Indikativ Präsens — wrong mood"
+  },
+  {
+    "id": "completion_adj_001",
+    "exercise_type": "COMPLETION",
+    "question": "Setze die korrekte Form von 'nett' im Satz 'Der ... Mann lacht' (Nom. Mask. Sg. nach bestimmtem Artikel).",
+    "grammar_rule": "Schwache Adjektivdeklination — bestimmter Artikel, Nominativ Maskulin Singular",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Volle Adjektivform 'nett' + Endung der schwachen Deklination nach bestimmtem Artikel im Nom. Mask. Sg. — also 'nette'.",
+        "example_answer": "nette",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["nette"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "Criterion now explicitly demands full word 'nette' — no ending-vs-word ambiguity"
+  },
+  {
+    "id": "completion_adj_002",
+    "exercise_type": "COMPLETION",
+    "question": "Setze die korrekte Form von 'nett' im Satz 'Der ... Mann lacht' (Nom. Mask. Sg. nach bestimmtem Artikel).",
+    "grammar_rule": "Schwache Adjektivdeklination — bestimmter Artikel, Nominativ Maskulin Singular",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Volle Adjektivform 'nett' + Endung der schwachen Deklination nach bestimmtem Artikel im Nom. Mask. Sg. — also 'nette'.",
+        "example_answer": "nette",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["netter"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "Strong declension ending — wrong class"
+  },
+  {
+    "id": "fitb_konjunktion_und_001",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die koordinierende kausale Konjunktion ein: 'Ich gehe heute einkaufen ... ich brauche Brot.'",
+    "grammar_rule": "Koordinierende Konjunktionen — Hauptsatz + Hauptsatz, V2-Stellung",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine koordinierende kausale Konjunktion, die V2-Stellung im zweiten Hauptsatz erlaubt — 'denn'. Subordinierende Konjunktionen wie 'weil' oder 'da' sind hier falsch, da die Wortstellung im Folgesatz V2 ist.",
+        "example_answer": "denn",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["denn"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "denn correct — V2 after"
+  },
+  {
+    "id": "fitb_konjunktion_und_002",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze die koordinierende kausale Konjunktion ein: 'Ich gehe heute einkaufen ... ich brauche Brot.'",
+    "grammar_rule": "Koordinierende Konjunktionen — Hauptsatz + Hauptsatz, V2-Stellung",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Eine koordinierende kausale Konjunktion, die V2-Stellung im zweiten Hauptsatz erlaubt — 'denn'. Subordinierende Konjunktionen wie 'weil' oder 'da' sind hier falsch, da die Wortstellung im Folgesatz V2 ist.",
+        "example_answer": "denn",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["weil"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "weil would force Verbendstellung; sentence has V2 — wrong"
+  },
+  {
+    "id": "completion_dativ_plural_001",
+    "exercise_type": "COMPLETION",
+    "question": "Setze 'die Kinder' in den Dativ ein: 'Ich gebe ... ein Geschenk.'",
+    "grammar_rule": "Dativ Plural — Pluralartikel + Pluralnomen + -n",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Dativ Plural der Phrase 'die Kinder' — also 'den Kindern'. Die Pluralform muss das -n im Dativ tragen.",
+        "example_answer": "den Kindern",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["den Kindern"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "Dativ Plural mit -n"
+  },
+  {
+    "id": "completion_dativ_plural_002",
+    "exercise_type": "COMPLETION",
+    "question": "Setze 'die Kinder' in den Dativ ein: 'Ich gebe ... ein Geschenk.'",
+    "grammar_rule": "Dativ Plural — Pluralartikel + Pluralnomen + -n",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Dativ Plural der Phrase 'die Kinder' — also 'den Kindern'. Die Pluralform muss das -n im Dativ tragen.",
+        "example_answer": "den Kindern",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["die Kinder"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "Plural Nominativ statt Dativ — fehlende Endung"
+  },
+  {
+    "id": "fitb_relativsatz_001",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze das Relativpronomen ein: 'Das ist der Mann, ... mir gestern geholfen hat.'",
+    "grammar_rule": "Relativpronomen — Nominativ Maskulin Singular",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Relativpronomen im Nominativ Maskulin Singular — also 'der'. Akkusativ- oder Dativformen sind hier falsch.",
+        "example_answer": "der",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["der"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "Relativpronomen Nominativ"
+  },
+  {
+    "id": "fitb_relativsatz_002",
+    "exercise_type": "FILL_IN_THE_BLANK",
+    "question": "Setze das Relativpronomen ein: 'Das ist der Mann, ... mir gestern geholfen hat.'",
+    "grammar_rule": "Relativpronomen — Nominativ Maskulin Singular",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Relativpronomen im Nominativ Maskulin Singular — also 'der'. Akkusativ- oder Dativformen sind hier falsch.",
+        "example_answer": "der",
+        "is_sentence_initial": false
+      }
+    ],
+    "student_answers": ["den"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "Akkusativ — falscher Kasus"
+  },
+  {
+    "id": "completion_imperativ_wir_lowercase",
+    "exercise_type": "COMPLETION",
+    "question": "Bilde den Imperativ wir-Form von 'singen', um zusammen zu singen.",
+    "grammar_rule": "Imperativ wir-Form — Großschreibung am Satzanfang",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Imperativ wir-Form von 'singen' am Satzanfang — also großgeschrieben 'Singen' (gefolgt von 'wir').",
+        "example_answer": "Singen wir zusammen!",
+        "is_sentence_initial": true
+      }
+    ],
+    "student_answers": ["singen wir zusammen!"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "Lowercase at sentence start — judge must reject orthographic error even when morphology is right"
+  },
+  {
+    "id": "completion_imperativ_du_lowercase",
+    "exercise_type": "COMPLETION",
+    "question": "Bilde den Imperativ du-Form von 'öffnen', um zur Tür-Öffnung aufzufordern.",
+    "grammar_rule": "Imperativ du-Form — Großschreibung am Satzanfang",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Imperativ du-Form von 'öffnen' am Satzanfang — also großgeschrieben 'Öffne'.",
+        "example_answer": "Öffne die Tür!",
+        "is_sentence_initial": true
+      }
+    ],
+    "student_answers": ["öffne die Tür!"],
+    "expected_correct": false,
+    "bucket": "clearly_wrong",
+    "note": "Lowercase at sentence start — regression for öffne FP that previously slipped through"
+  },
+  {
+    "id": "completion_imperativ_wir_uppercase",
+    "exercise_type": "COMPLETION",
+    "question": "Bilde den Imperativ wir-Form von 'singen', um zusammen zu singen.",
+    "grammar_rule": "Imperativ wir-Form — Großschreibung am Satzanfang",
+    "blanks": [
+      {
+        "index": 0,
+        "grading_criterion": "Imperativ wir-Form von 'singen' am Satzanfang — also großgeschrieben 'Singen' (gefolgt von 'wir').",
+        "example_answer": "Singen wir zusammen!",
+        "is_sentence_initial": true
+      }
+    ],
+    "student_answers": ["Singen wir zusammen!"],
+    "expected_correct": true,
+    "bucket": "exactly_correct",
+    "note": "Positive control — correctly capitalized form passes"
   }
 ]

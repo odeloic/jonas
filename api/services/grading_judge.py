@@ -1,30 +1,50 @@
-"""LLM-as-judge for semantic grading evaluation.
+"""LLM-as-judge for criterion-based grading of one blank at a time.
 
-All judge calls use trace_name='semantic_grading' so they are visible in
-Langfuse under the reserved trace group that ODE-245 will query.
+Each call grades ONE blank against ONE student answer string. Multi-blank items are
+graded by `scoring._score_criterion`, which calls the judge once per blank and
+aggregates verdicts.
+
+All judge calls use trace_name='semantic_grading' so they aggregate in Langfuse
+under the reserved trace group queried by the grading-eval dashboard.
 """
 
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
+from models.assignment_schema import Blank
 from services.llm_service import LLMResult, LLMService
 
 _JUDGE_SYSTEM_PROMPT = """\
-Du bist ein Experte für die deutsche Sprache und bewertest Schülerantworten.
+Du bist ein Experte für die deutsche Sprache und bewertest EINE Schülerantwort gegen \
+EIN grading_criterion.
 
-Entscheide, ob die Schülerantwort inhaltlich korrekt ist (is_correct: true oder false).
-Semantisch gleichwertige Antworten gelten als korrekt — zum Beispiel gültige V2-Umstellungen
-oder Perfekt statt Präteritum in gesprochen-deutschem Kontext.
+Du erhältst:
+- die Aufgabenfrage (Kontext),
+- ein grading_criterion (Naturalsprachliche Beschreibung der Regel, die getestet wird, \
+  und was eine korrekte Antwort ausmacht),
+- ein example_answer (EINE mögliche Musterantwort — KEINE Ankerlösung. \
+  Andere Antworten, die das Kriterium erfüllen, sind ebenso korrekt.),
+- ein Flag is_sentence_initial (true/false) — sagt dir, ob diese Antwort das erste Wort \
+  des Zielsatzes ist,
+- die Schülerantwort als Text.
 
-Wichtig bei Konnektoren: Koordinierende Konjunktionen (denn, aber, oder, und, sondern) und
-subordinierende Konjunktionen (weil, da, obwohl, wenn, dass …) sind NICHT austauschbar,
-auch wenn sie inhaltlich ähnlich sind. Sie verlangen unterschiedliche Wortstellungen.
-Wenn die Satzstruktur in der Frage bereits eine bestimmte Wortstellung vorgibt (z. B.
-Verbendstellung im Nebensatz), ist nur der passende Konjunktionstyp korrekt.
+Bewerte ausschließlich danach, ob die Schülerantwort das grading_criterion erfüllt. \
+Lexikalische Abweichungen zur example_answer sind erlaubt, solange das Kriterium erfüllt \
+ist (z. B. "meiner Freundin" statt "meiner Schwester" für eine feminine Genitiv-Nominalphrase).
 
-Gib außerdem eine Punktzahl von 0.0 (völlig falsch) bis 1.0 (vollständig korrekt)
-und eine kurze Begründung auf Deutsch.
+Großschreibungsregel:
+- Wenn is_sentence_initial=true, MUSS die Schülerantwort mit einem Großbuchstaben \
+  beginnen. Sonst ist die Antwort falsch, auch wenn die Morphologie stimmt.
+- Wenn is_sentence_initial=false, spielt Großschreibung keine Rolle für die Bewertung — \
+  beurteile rein die Morphologie/Lexik gegen das Kriterium.
+
+Erfinde KEINE Toleranz, die nicht im Kriterium steht. Wenn das Kriterium eine bestimmte \
+Form nennt, ist nur diese Form (oder genauso passende Alternativen für lexikalisch freie \
+Lücken) korrekt.
+
+Gib eine Punktzahl von 0.0 (völlig falsch) bis 1.0 (vollständig korrekt) und eine kurze \
+Begründung auf Deutsch zurück.
 """
 
 
@@ -42,16 +62,17 @@ class JudgeResult:
     raw_result: LLMResult
 
 
-async def judge_answer(
+async def judge_blank(
     *,
-    student_answer: str,
-    correct_answer: str,
     question: str,
+    blank: Blank,
+    student_answer: str,
     llm: LLMService,
 ) -> JudgeResult:
-    """Grade a student answer against the correct answer using an LLM judge.
+    """Grade ONE student answer against ONE blank's criterion.
 
-    Always traces as 'semantic_grading' — the reserved trace name for ODE-245.
+    Always traces as 'semantic_grading' — the reserved trace name for the
+    grading-eval dashboard.
     """
     messages = [
         {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
@@ -59,7 +80,9 @@ async def judge_answer(
             "role": "user",
             "content": (
                 f"Frage: {question}\n"
-                f"Musterantwort: {correct_answer}\n"
+                f"Kriterium: {blank.grading_criterion}\n"
+                f"Beispielantwort: {blank.example_answer}\n"
+                f"is_sentence_initial: {str(blank.is_sentence_initial).lower()}\n"
                 f"Schülerantwort: {student_answer}"
             ),
         },

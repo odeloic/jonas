@@ -44,24 +44,53 @@ export interface Stats {
 export type SectionType =
   | "REORDER"
   | "COMPLETION"
-  | "ADJEKTIV_DEKLINATION"
   | "FILL_IN_THE_BLANK"
   | "MULTIPLE_CHOICE";
 
-export interface AssignmentItem {
-  question: string;
-  options: string[] | null;
+export interface OptionView {
+  index: number;
+  text: string;
+  // is_correct is intentionally NOT exposed — server omits it from the public payload.
 }
 
-export interface AssignmentSection {
+export interface BlankView {
+  index: number;
+  // grading_criterion / example_answer / is_sentence_initial are server-side only;
+  // the client just needs the count and indices to render labeled inputs.
+}
+
+export interface ReorderExerciseItem {
+  type: "REORDER";
+  // Shuffled bag of token texts. The correct order lives server-side.
+  tokens: string[];
+}
+
+export interface MultipleChoiceExerciseItem {
+  type: "MULTIPLE_CHOICE";
+  question: string;
+  options: OptionView[];
+}
+
+export interface CriterionExerciseItem {
+  type: "COMPLETION" | "FILL_IN_THE_BLANK";
+  question: string;
+  blanks: BlankView[];
+}
+
+export type ExerciseItem =
+  | ReorderExerciseItem
+  | MultipleChoiceExerciseItem
+  | CriterionExerciseItem;
+
+export interface ExerciseSection {
   type: SectionType;
   title: string;
   instructions: string;
-  items: AssignmentItem[];
+  items: ExerciseItem[];
 }
 
-export interface AssignmentContent {
-  sections: AssignmentSection[];
+export interface ExerciseContent {
+  sections: ExerciseSection[];
 }
 
 export interface AssignmentSummary {
@@ -77,7 +106,7 @@ export interface AssignmentDetail {
   id: number;
   type: string;
   topic: string;
-  content: AssignmentContent;
+  content: ExerciseContent;
   source: string;
   created_at: string;
 }
@@ -113,18 +142,29 @@ export interface FlashcardSetDetail {
 // --- Submission types ---
 
 export interface SectionAnswers {
-  items: string[];
+  items: string[][];
 }
 
 export interface SubmissionAnswers {
   sections: SectionAnswers[];
 }
 
+export interface BlankFeedback {
+  index: number;
+  correct: boolean;
+  rationale: string;
+  example_answer: string | null;
+  grading_criterion: string | null;
+}
+
 export interface ItemFeedback {
   correct: boolean;
-  user_answer: string;
-  correct_answer: string;
+  user_answer: string[];
+  correct_answer: string | null;
+  example_answer: string | null;
+  grading_criterion: string | null;
   hint: string | null;
+  blank_feedbacks: BlankFeedback[] | null;
 }
 
 export interface SectionFeedback {
